@@ -697,29 +697,37 @@ export class GraphQLValidationUtils {
             const pathParts = fieldPath.split('.').filter(p => p);
             if (pathParts.length === 0) return null;
 
-            let currentType: GraphQLObjectType | GraphQLInterfaceType | null = schema.getQueryType() || null;
-            if (!currentType) return null;
+            const tryFromRoot = (root: GraphQLObjectType | null): GraphQLInputType | null => {
+                if (!root) return null;
+                let currentType: GraphQLObjectType | GraphQLInterfaceType | null = root;
+                for (let i = 0; i < pathParts.length; i++) {
+                    const fieldName = pathParts[i];
+                    const fields = (currentType as any).getFields?.();
+                    const field: any = fields ? fields[fieldName] : undefined;
+                    if (!field) return null;
 
-            // Navigate through the path to find the field
-            for (let i = 0; i < pathParts.length; i++) {
-                const fieldName = pathParts[i];
-                const field: any = currentType.getFields()[fieldName];
-                if (!field) return null;
-
-                if (i === pathParts.length - 1) {
-                    // This is the target field, look for the argument
-                    const arg = field.args.find((a: any) => a.name === argumentName);
-                    return arg ? (arg.type as GraphQLInputType) : null;
-                } else {
-                    // Navigate deeper
-                    const fieldType: any = getNamedType(field.type);
-                    if (isObjectType(fieldType) || isInterfaceType(fieldType)) {
-                        currentType = fieldType;
+                    if (i === pathParts.length - 1) {
+                        const arg = field.args?.find((a: any) => a.name === argumentName);
+                        return arg ? (arg.type as GraphQLInputType) : null;
                     } else {
-                        return null;
+                        const fieldType: any = getNamedType(field.type);
+                        if (isObjectType(fieldType) || isInterfaceType(fieldType)) {
+                            currentType = fieldType;
+                        } else {
+                            return null;
+                        }
                     }
                 }
-            }
+                return null;
+            };
+
+            // Try query, then mutation, then subscription roots
+            const fromQuery = tryFromRoot(schema.getQueryType?.() || null);
+            if (fromQuery) return fromQuery;
+            const fromMutation = tryFromRoot(schema.getMutationType?.() || null);
+            if (fromMutation) return fromMutation;
+            const fromSubscription = tryFromRoot(schema.getSubscriptionType?.() || null);
+            if (fromSubscription) return fromSubscription;
 
             return null;
         } catch (error) {

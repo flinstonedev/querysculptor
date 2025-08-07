@@ -1,5 +1,7 @@
 import { z } from "zod";
-import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils } from "./shared-utils.js";
+import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils, fetchAndCacheSchema } from "./shared-utils.js";
+import { isTypeSubTypeOf, typeFromAST } from "graphql";
+import { parseType } from "graphql/language/parser.js";
 
 // Core business logic - testable function
 export async function setVariableArgument(
@@ -44,6 +46,14 @@ export async function setVariableArgument(
             };
         }
 
+        // Ensure variable is defined in the session
+        const variableTypeStr = queryState.variablesSchema[variableName];
+        if (!variableTypeStr) {
+            return {
+                error: `Variable '${variableName}' is not defined in the query schema. Use set-query-variable first.`
+            };
+        }
+
         // Navigate to field in query structure
         let currentNode = queryState.queryStructure;
         if (fieldPath) {
@@ -56,6 +66,33 @@ export async function setVariableArgument(
                 }
                 currentNode = currentNode.fields[part];
             }
+        }
+
+        // Schema-aware validation: check that the field has the argument and that the variable type is compatible
+        try {
+            const schema = await fetchAndCacheSchema(queryState.headers);
+
+            // Ensure argument exists
+            const argType = GraphQLValidationUtils.getArgumentType(schema, fieldPath, argumentName);
+            if (!argType) {
+                return {
+                    error: `Argument '${argumentName}' not found on field '${fieldPath}'.`
+                };
+            }
+
+            // Parse variable GraphQL type
+            const varTypeNode = parseType(variableTypeStr);
+            const varGqlType = typeFromAST(schema, varTypeNode as any);
+            if (!varGqlType) {
+                return { error: `Could not determine type for variable '${variableName}' of declared type '${variableTypeStr}'.` };
+            }
+
+            // Check type compatibility (variable type must be usable where argument type is expected)
+            if (!isTypeSubTypeOf(schema as any, varGqlType as any, argType as any)) {
+                return { error: `Variable '${variableName}' of type '${variableTypeStr}' cannot be used for argument '${argumentName}' of type '${String(argType)}'.` };
+            }
+        } catch (schemaError: any) {
+            return { error: `Schema validation failed for variable argument: ${schemaError.message}` };
         }
 
         // Set the argument value

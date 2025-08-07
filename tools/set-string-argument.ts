@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils } from "./shared-utils.js";
+import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils, fetchAndCacheSchema } from "./shared-utils.js";
+import { isEnumType } from 'graphql';
 
 // Core business logic - testable function
 export async function setStringArgument(
@@ -48,21 +49,26 @@ export async function setStringArgument(
             };
         }
 
-        // Validate argument against schema
+        // Validate argument against schema and enforce string/enum compatibility
         try {
-            const { fetchAndCacheSchema } = await import('./shared-utils.js');
             const schema = await fetchAndCacheSchema(queryState.headers);
-            if (schema) {
-                const argType = GraphQLValidationUtils.getArgumentType(schema, fieldPath, argumentName);
-                if (!argType) {
-                    return {
-                        error: `Argument '${argumentName}' not found on field '${fieldPath}'. Please check the schema documentation.`
-                    };
+            const argType = GraphQLValidationUtils.getArgumentType(schema, fieldPath, argumentName);
+            if (!argType) {
+                return {
+                    error: `Argument '${argumentName}' not found on field '${fieldPath}'. Please check the schema documentation.`
+                };
+            }
+
+            // If caller marks isEnum=true, ensure the argType base type is an Enum
+            if (isEnum) {
+                const baseTypeName = String(argType).replace(/[\[\]!]/g, '');
+                const baseType = schema.getType(baseTypeName);
+                if (!baseType || !isEnumType(baseType)) {
+                    return { error: `Argument '${argumentName}' is not an enum type, but 'isEnum' was set to true.` };
                 }
             }
         } catch (error) {
-            // Schema validation failed, but continue anyway to maintain backward compatibility
-            console.warn(`Schema validation failed for argument ${argumentName}:`, error);
+            return { error: `Schema validation failed for argument '${argumentName}': ${error instanceof Error ? error.message : String(error)}` };
         }
 
         // Navigate to field in query structure
@@ -86,7 +92,7 @@ export async function setStringArgument(
 
         // Enhanced type detection and coercion
         if (isEnum) {
-            (currentNode as any).args[argumentName] = { value, is_enum: true }; // Store enum with proper flag
+            (currentNode as any).args[argumentName] = { value, is_enum: true };
         } else {
             // Auto-detect numeric and boolean values for better GraphQL output
             const coercedResult = GraphQLValidationUtils.coerceStringValue(value);
@@ -96,7 +102,7 @@ export async function setStringArgument(
                 (currentNode as any).args[argumentName] = {
                     value: coercedResult.value,
                     is_typed: true,
-                    original_string: value // Keep original for debugging
+                    original_string: value
                 };
             } else {
                 // Store string with special marker to indicate it needs quoting during query building

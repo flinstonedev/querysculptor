@@ -6,7 +6,7 @@ import {
     fetchAndCacheSchema,
     validateInputComplexity
 } from "./shared-utils.js";
-import { getNamedType } from 'graphql';
+import { getNamedType, isInputObjectType, isScalarType } from 'graphql';
 
 async function setObjectValueByPath(obj: any, path: string, value: any) {
     const keys = path.split('.');
@@ -69,6 +69,21 @@ export async function setInputObjectArgument(
             return {
                 error: `Cannot set input object properties on variable argument '${argumentName}'. The argument is currently set to variable '${existingArg}'. Remove the variable first or use a different approach.`
             };
+        }
+
+        // Validate that the argument type is an input object in the schema
+        try {
+            const schema = await fetchAndCacheSchema(queryState.headers);
+            const argType = GraphQLValidationUtils.getArgumentType(schema, fieldPath, argumentName);
+            if (!argType) {
+                return { error: `Argument '${argumentName}' not found on field '${fieldPath}'.` };
+            }
+            const named = getNamedType(argType as any);
+            if (!isInputObjectType(named)) {
+                return { error: `Argument '${argumentName}' is not an input object type and cannot have nested properties.` };
+            }
+        } catch (schemaError: any) {
+            return { error: `Schema validation failed for input object argument: ${schemaError.message}` };
         }
 
         if (!(fieldNode as any).args[argumentName]) {

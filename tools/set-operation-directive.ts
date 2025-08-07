@@ -1,5 +1,7 @@
 import { z } from "zod";
-import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils } from "./shared-utils.js";
+import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils, fetchAndCacheSchema } from "./shared-utils.js";
+import { isTypeSubTypeOf, typeFromAST } from "graphql";
+import { parseType } from "graphql/language/parser.js";
 
 // Core business logic - testable function
 export async function setOperationDirective(
@@ -29,6 +31,45 @@ export async function setOperationDirective(
             return {
                 error: 'Session not found.'
             };
+        }
+
+        // If argument provided, validate against schema
+        if (argumentName) {
+            try {
+                const schema = await fetchAndCacheSchema(queryState.headers);
+                const directive = schema.getDirective(directiveName);
+                if (!directive) {
+                    return { error: `Directive '@${directiveName}' not found in the schema.` };
+                }
+
+                const argDef = directive.args.find(a => a.name === argumentName);
+                if (!argDef) {
+                    return { error: `Argument '${argumentName}' not found on directive '@${directiveName}'.` };
+                }
+
+                if (typeof argumentValue === 'string' && argumentValue.startsWith('$')) {
+                    const variableName = argumentValue;
+                    const variableTypeStr = queryState.variablesSchema[variableName];
+                    if (!variableTypeStr) {
+                        return { error: `Variable '${variableName}' is not defined.` };
+                    }
+                    const varTypeNode = parseType(variableTypeStr);
+                    const varGqlType = typeFromAST(schema, varTypeNode as any);
+                    if (!varGqlType) {
+                        return { error: `Could not determine type for variable '${variableName}'.` };
+                    }
+                    if (!isTypeSubTypeOf(schema, varGqlType, argDef.type)) {
+                        return { error: `Variable '${variableName}' of type '${variableTypeStr}' cannot be used for argument '${argumentName}' of type '${argDef.type.toString()}'.` };
+                    }
+                } else if (argumentValue !== undefined) {
+                    const validationError = GraphQLValidationUtils.validateValueAgainstType(argumentValue, argDef.type);
+                    if (validationError) {
+                        return { error: `For argument '${argumentName}' on directive '@${directiveName}': ${validationError}` };
+                    }
+                }
+            } catch (e: any) {
+                return { error: `Directive argument validation failed: ${e.message}` };
+            }
         }
 
         // Add directive to operation
