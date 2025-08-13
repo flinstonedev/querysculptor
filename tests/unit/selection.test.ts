@@ -114,6 +114,8 @@ vi.mock('../../tools/shared-utils', async (importOriginal) => {
                 return String(v);
             },
             validateFieldInSchema: () => ({ valid: true, field: { type: {}, args: [] } }),
+            validateFieldAddition: () => ({ valid: true }),
+            validateArgumentAddition: () => ({ valid: true }),
         },
         getTypeNameStr: (type) => type.name || 'Unknown'
     };

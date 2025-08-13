@@ -498,6 +498,22 @@ export const createSharedUtilsMock = (customMocks = {}) => ({
       if (typeof value === 'string') return `"${value}"`;
       return String(value);
     }),
+    validateQueryStructure: vi.fn().mockImplementation((schema: any, queryState: any) => {
+      // Check for empty query
+      if (!queryState.queryStructure.fields || Object.keys(queryState.queryStructure.fields).length === 0) {
+        return {
+          valid: false,
+          errors: ['Query is empty. Add at least one field to the query.'],
+          warnings: []
+        };
+      }
+
+      return {
+        valid: true,
+        errors: [],
+        warnings: []
+      };
+    }),
     validateAgainstSchema: vi.fn().mockImplementation((queryString, schema) => {
       try {
         // Handle empty or whitespace-only queries

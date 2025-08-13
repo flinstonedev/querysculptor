@@ -94,6 +94,7 @@ describe('Query Execution', () => {
             { message: "Cannot query field 'nonExistent' on type 'Query'." }
         ] as any);
 
+
         const result = await validateGraphQLQuery('test-session');
 
         expect(result.valid).toBe(false);
@@ -139,6 +140,22 @@ describe('Enhanced Execution and Validation Tests', () => {
 
     describe('Schema Validation Edge Cases', () => {
         it('should handle syntax errors in query parsing', async () => {
+            // Set up a valid query state so it passes structure validation
+            const validQueryState = {
+                headers: {},
+                operationType: 'query',
+                operationTypeName: 'Query',
+                operationName: 'TestQuery',
+                queryStructure: {
+                    fields: { user: {} },  // Has fields so it passes structure validation
+                    fragmentSpreads: [],
+                    inlineFragments: []
+                },
+                variablesSchema: {},
+                variablesValues: {},
+                createdAt: new Date().toISOString(),
+            };
+            vi.mocked(sharedUtils.loadQueryState).mockResolvedValue(validQueryState as any);
             vi.mocked(sharedUtils.buildQueryFromStructure).mockReturnValue('query { user ( }'); // Invalid syntax
             vi.mocked(parse).mockImplementation(() => {
                 throw new Error('Syntax Error: Expected Name, found }');
@@ -150,6 +167,22 @@ describe('Enhanced Execution and Validation Tests', () => {
         });
 
         it('should handle multiple validation errors', async () => {
+            // Set up a valid query state so it passes structure validation
+            const validQueryState = {
+                headers: {},
+                operationType: 'query',
+                operationTypeName: 'Query',
+                operationName: 'TestQuery',
+                queryStructure: {
+                    fields: { nonExistent: {}, alsoNonExistent: {} },  // Has fields so it passes structure validation
+                    fragmentSpreads: [],
+                    inlineFragments: []
+                },
+                variablesSchema: {},
+                variablesValues: {},
+                createdAt: new Date().toISOString(),
+            };
+            vi.mocked(sharedUtils.loadQueryState).mockResolvedValue(validQueryState as any);
             vi.mocked(sharedUtils.buildQueryFromStructure).mockReturnValue('query { nonExistent, alsoNonExistent }');
             vi.mocked(parse).mockReturnValue({} as any);
             vi.mocked(validate).mockReturnValue([
@@ -172,6 +205,22 @@ describe('Enhanced Execution and Validation Tests', () => {
         });
 
         it('should handle invalid variable types', async () => {
+            // Set up a valid query state so it passes structure validation
+            const validQueryState = {
+                headers: {},
+                operationType: 'query',
+                operationTypeName: 'Query',
+                operationName: 'TestQuery',
+                queryStructure: {
+                    fields: { user: { fields: { name: {} } } },  // Has fields so it passes structure validation
+                    fragmentSpreads: [],
+                    inlineFragments: []
+                },
+                variablesSchema: { '$id': 'InvalidType' },  // This should trigger the invalid type check
+                variablesValues: {},
+                createdAt: new Date().toISOString(),
+            };
+            vi.mocked(sharedUtils.loadQueryState).mockResolvedValue(validQueryState as any);
             vi.mocked(sharedUtils.buildQueryFromStructure).mockReturnValue('query($id: InvalidType) { user(id: $id) { name } }');
             vi.mocked(parse).mockReturnValue({} as any);
             vi.mocked(validate).mockReturnValue([
@@ -235,6 +284,22 @@ describe('Enhanced Execution and Validation Tests', () => {
         });
 
         it('should validate queries with fragments', async () => {
+            // Set up a valid query state so it passes structure validation
+            const validQueryState = {
+                headers: {},
+                operationType: 'query',
+                operationTypeName: 'Query',
+                operationName: 'TestQuery',
+                queryStructure: {
+                    fields: { user: { fields: { invalidField: {} } } },  // Has fields so it passes structure validation
+                    fragmentSpreads: [],
+                    inlineFragments: []
+                },
+                variablesSchema: {},
+                variablesValues: {},
+                createdAt: new Date().toISOString(),
+            };
+            vi.mocked(sharedUtils.loadQueryState).mockResolvedValue(validQueryState as any);
             vi.mocked(sharedUtils.buildQueryFromStructure).mockReturnValue(`
                 query {
                     user(id: "1") {
@@ -256,19 +321,51 @@ describe('Enhanced Execution and Validation Tests', () => {
         });
 
         it('should handle empty query validation', async () => {
+            // Create a query state with empty fields to trigger the empty query validation
+            const emptyQueryState = {
+                headers: {},
+                operationType: 'query',
+                operationTypeName: 'Query',
+                operationName: 'TestQuery',
+                queryStructure: {
+                    fields: {},  // Empty fields should trigger the validation error
+                    fragmentSpreads: [],
+                    inlineFragments: []
+                },
+                variablesSchema: {},
+                variablesValues: {},
+                createdAt: new Date().toISOString(),
+            };
+            vi.mocked(sharedUtils.loadQueryState).mockResolvedValue(emptyQueryState as any);
             vi.mocked(sharedUtils.buildQueryFromStructure).mockReturnValue('');
 
             const result = await validateGraphQLQuery('test-session');
             expect(result.valid).toBe(false);
-            expect(result.errors).toContain('Query is empty. Add fields to the query structure first.');
+            expect(result.errors).toContain('Query is empty. Add at least one field to the query.');
         });
 
         it('should handle whitespace-only query validation', async () => {
+            // Create a query state with empty fields to trigger the empty query validation
+            const emptyQueryState = {
+                headers: {},
+                operationType: 'query',
+                operationTypeName: 'Query',
+                operationName: 'TestQuery',
+                queryStructure: {
+                    fields: {},  // Empty fields should trigger the validation error
+                    fragmentSpreads: [],
+                    inlineFragments: []
+                },
+                variablesSchema: {},
+                variablesValues: {},
+                createdAt: new Date().toISOString(),
+            };
+            vi.mocked(sharedUtils.loadQueryState).mockResolvedValue(emptyQueryState as any);
             vi.mocked(sharedUtils.buildQueryFromStructure).mockReturnValue('   \n  \t  ');
 
             const result = await validateGraphQLQuery('test-session');
             expect(result.valid).toBe(false);
-            expect(result.errors).toContain('Query is empty. Add fields to the query structure first.');
+            expect(result.errors).toContain('Query is empty. Add at least one field to the query.');
         });
     });
 
@@ -447,7 +544,23 @@ describe('Enhanced Execution and Validation Tests', () => {
 
     describe('Test Mode and Edge Cases', () => {
         it('should skip validation in test mode', async () => {
-            // Use a simple query that exists in our test schema
+            // Create a query state with testField to trigger the special test mode handling
+            const testQueryState = {
+                headers: {},
+                operationType: 'query',
+                operationTypeName: 'Query',
+                operationName: 'TestQuery',
+                queryStructure: {
+                    fields: { testField: {} },  // Has fields so it passes structure validation
+                    fragmentSpreads: [],
+                    inlineFragments: []
+                },
+                variablesSchema: {},
+                variablesValues: {},
+                createdAt: new Date().toISOString(),
+            };
+            
+            vi.mocked(sharedUtils.loadQueryState).mockResolvedValue(testQueryState as any);
             vi.mocked(sharedUtils.buildQueryFromStructure).mockReturnValue('query { testField }');
 
             const result = await validateGraphQLQuery('test-session');

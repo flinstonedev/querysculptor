@@ -6,6 +6,7 @@ import * as sharedUtils from '../../tools/shared-utils';
 vi.mock('../../tools/shared-utils', () => ({
     loadQueryState: vi.fn(),
     saveQueryState: vi.fn(),
+    fetchAndCacheSchema: vi.fn().mockResolvedValue({}),
     GraphQLValidationUtils: {
         isValidGraphQLName: vi.fn().mockReturnValue(true),
         coerceStringValue: vi.fn((v) => ({ coerced: false, value: v })),
@@ -45,6 +46,8 @@ vi.mock('../../tools/shared-utils', () => ({
             }
             return { valid: true };
         }),
+        validateArgumentAddition: vi.fn().mockReturnValue({ valid: true }),
+        validateFieldAddition: vi.fn().mockReturnValue({ valid: true }),
     },
 }));
 

@@ -82,6 +82,8 @@ vi.mock('../../tools/shared-utils.js', async () => {
                 }
                 return { valid: true };
             }),
+            validateArgumentAddition: vi.fn().mockReturnValue({ valid: true }),
+            validateFieldAddition: vi.fn().mockReturnValue({ valid: true }),
         }
     });
 

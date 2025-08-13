@@ -68,6 +68,20 @@ vi.mock('../../tools/shared-utils', async () => {
                 }
                 return { valid: true };
             }),
+            validateArgumentAddition: (schema: any, queryState: any, fieldPath: string, argumentName: string, value: any, isVariable: boolean = false) => {
+                // Mock validation that allows most arguments through
+                if (!/^[_A-Za-z][_0-9A-Za-z]*$/.test(argumentName)) {
+                    return { valid: false, error: `Invalid argument name "${argumentName}"` };
+                }
+                return { valid: true };
+            },
+            validateFieldAddition: (schema: any, queryState: any, parentPath: string, fieldName: string, alias?: string) => {
+                // Mock validation that allows most fields through
+                if (!/^[_A-Za-z][_0-9A-Za-z]*$/.test(fieldName)) {
+                    return { valid: false, error: `Invalid field name "${fieldName}"` };
+                }
+                return { valid: true };
+            },
             validateNoControlCharacters: vi.fn().mockImplementation((value: string, name: string) => {
                 // eslint-disable-next-line no-control-regex
                 const controlCharRegex = /[\u0000-\u001F\u007F-\u009F]/;

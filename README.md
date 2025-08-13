@@ -26,6 +26,12 @@ QuerySculptor provides **26 tools** via the Model Context Protocol (MCP) that al
 
 Works best with Claude Sonnet models - results may vary with other LLMs.
 
+## 📖 **For AI Agents**
+
+**New to QuerySculptor?**
+- 📋 **[Agent System Prompt](./AGENT_SYSTEM_PROMPT.md)** - Complete guide for AI agents
+- ⚡ **[Quick Reference](./AGENT_QUICK_REFERENCE.md)** - Essential workflow and tools
+
 ## 🎯 **Problem and Solution**
 
 ### **Before: Complex GraphQL Generation**

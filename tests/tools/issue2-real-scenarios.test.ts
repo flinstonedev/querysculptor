@@ -57,6 +57,7 @@ vi.mock('../../tools/shared-utils.js', async () => {
                 }
                 return { valid: true };
             }),
+            validateArgumentAddition: vi.fn().mockReturnValue({ valid: true }),
             validateNoControlCharacters: vi.fn().mockImplementation((value: string, name: string) => {
                 // eslint-disable-next-line no-control-regex
                 const controlCharRegex = /[\u0000-\u001F\u007F-\u009F]/;

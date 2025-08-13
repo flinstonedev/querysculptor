@@ -46,65 +46,27 @@ export async function selectMultipleFields(
             }
         }
 
-        // Optional field validation - only validate if we can properly resolve the schema and type
+        // Comprehensive incremental validation for each field
         try {
             const schema = await fetchAndCacheSchema(queryState.headers);
-            if (schema) {
-                // Determine the parent type for validation
-                let parentType: GraphQLObjectType | GraphQLInterfaceType | null = null;
-                if (parentPath === "") {
-                    // Root level - use the operation type
-                    const operationType = queryState.operationType || 'query';
-                    parentType = schema.getQueryType() || null;
-                    if (operationType === 'mutation') {
-                        parentType = schema.getMutationType() || null;
-                    } else if (operationType === 'subscription') {
-                        parentType = schema.getSubscriptionType() || null;
-                    }
-                } else {
-                    // Navigate to parent type through the path
-                    let currentType: GraphQLObjectType | GraphQLInterfaceType | null = schema.getQueryType() || null;
-                    const pathParts = parentPath.split('.');
+            for (const fieldName of fieldNames) {
+                const validation = GraphQLValidationUtils.validateFieldAddition(
+                    schema,
+                    queryState,
+                    parentPath,
+                    fieldName
+                );
 
-                    for (const part of pathParts) {
-                        if (!currentType || (!isObjectType(currentType) && !isInterfaceType(currentType))) {
-                            currentType = null;
-                            break;
-                        }
-
-                        const fieldDef: GraphQLField<any, any> | undefined = currentType.getFields()[part];
-                        if (!fieldDef) {
-                            currentType = null;
-                            break;
-                        }
-
-                        const namedType: GraphQLNamedType = getNamedType(fieldDef.type);
-                        if (isObjectType(namedType) || isInterfaceType(namedType)) {
-                            currentType = namedType;
-                        } else {
-                            currentType = null;
-                            break;
-                        }
-                    }
-
-                    parentType = currentType;
-                }
-
-                // Only validate if we successfully resolved the parent type
-                if (parentType && (isObjectType(parentType) || isInterfaceType(parentType))) {
-                    const availableFields = parentType.getFields();
-                    const invalidFields = fieldNames.filter(fieldName => !availableFields[fieldName]);
-
-                    if (invalidFields.length > 0) {
-                        return {
-                            error: `Invalid fields on type '${parentType.name}': ${invalidFields.join(', ')}. Available fields: ${Object.keys(availableFields).join(', ')}`
-                        };
-                    }
+                if (!validation.valid) {
+                    return {
+                        error: validation.error
+                    };
                 }
             }
         } catch (validationError) {
-            // If validation fails, continue without validation to maintain backward compatibility
-            console.warn('Field validation failed, continuing without validation:', validationError);
+            return {
+                error: `Schema validation failed: ${validationError instanceof Error ? validationError.message : String(validationError)}`
+            };
         }
 
         // Add all fields to the query structure

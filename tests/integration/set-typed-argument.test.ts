@@ -16,6 +16,8 @@ vi.mock('../../tools/shared-utils', async (importOriginal) => {
             ...original.GraphQLValidationUtils,
             isValidGraphQLName: vi.fn().mockReturnValue(true),
             getArgumentType: vi.fn(),
+            validateArgumentAddition: vi.fn().mockReturnValue({ valid: true }),
+            validateFieldAddition: vi.fn().mockReturnValue({ valid: true }),
         }
     };
 });

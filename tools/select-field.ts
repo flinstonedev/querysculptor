@@ -44,54 +44,29 @@ export async function selectGraphQLField(
             };
         }
 
-        // Real-time schema validation
+        // Comprehensive incremental validation
         try {
             const schema = await fetchAndCacheSchema(queryState.headers);
+            const validation = GraphQLValidationUtils.validateFieldAddition(
+                schema,
+                queryState,
+                parentPath,
+                fieldName,
+                alias
+            );
 
-            // Determine the current type context for validation
-            let currentType = schema.getType(queryState.operationTypeName);
-
-            if (parentPath) {
-                const pathParts = parentPath.split('.');
-                let currentQueryNode = queryState.queryStructure;
-
-                for (const part of pathParts) {
-                    if (!currentQueryNode.fields[part]) {
-                        return {
-                            error: `Parent path '${parentPath}' not found in query structure.`
-                        };
-                    }
-
-                    // Navigate through the type system
-                    if (isObjectType(currentType) || isInterfaceType(currentType)) {
-                        const fields = currentType.getFields();
-                        const field = fields[part];
-                        if (field) {
-                            currentType = getNamedType(field.type);
-                        }
-                    }
-
-                    currentQueryNode = currentQueryNode.fields[part];
-                }
+            if (!validation.valid) {
+                return {
+                    error: validation.error
+                };
             }
 
-            // Validate the field exists on the current type
-            if (isObjectType(currentType) || isInterfaceType(currentType)) {
-                const fieldValidation = GraphQLValidationUtils.validateFieldInSchema(
-                    schema,
-                    currentType,
-                    fieldName
-                );
-
-                if (!fieldValidation.valid) {
-                    return {
-                        error: fieldValidation.error
-                    };
-                }
-            }
+            // Store any warnings for later reporting
+            const warning = validation.warning;
         } catch (schemaError) {
-            // If schema validation fails, warn but continue
-            console.warn('Schema validation failed:', schemaError);
+            return {
+                error: `Schema validation failed: ${schemaError instanceof Error ? schemaError.message : String(schemaError)}`
+            };
         }
 
         // Navigate to the parent node in the query structure

@@ -22,7 +22,7 @@ describe('Core Type Validation Unit Tests', () => {
 
             it('should reject JavaScript float as GraphQL Int', () => {
                 const result = GraphQLValidationUtils.validateValueAgainstType(1.5, GraphQLInt);
-                expect(result).toContain('Int expects an integer');
+                expect(result).toContain('Int cannot represent non-integer value');
             });
 
             it('should accept valid string numbers as GraphQL Int (type coercion)', () => {
@@ -32,7 +32,7 @@ describe('Core Type Validation Unit Tests', () => {
 
             it('should reject invalid string as GraphQL Int', () => {
                 const result = GraphQLValidationUtils.validateValueAgainstType("not_a_number", GraphQLInt);
-                expect(result).toContain('Int expects an integer');
+                expect(result).toContain('Int cannot represent non-integer value');
             });
 
             it('should reject null for NonNull Int', () => {
@@ -131,7 +131,7 @@ describe('Core Type Validation Unit Tests', () => {
 
             it('should show proper error messages for type mismatches', () => {
                 const intError = GraphQLValidationUtils.validateValueAgainstType("not_a_number", GraphQLInt);
-                expect(intError).toContain('Int expects an integer');
+                expect(intError).toContain('Int cannot represent non-integer value');
                 expect(intError).toContain('not_a_number');
 
                 const boolError = GraphQLValidationUtils.validateValueAgainstType("not_a_boolean", GraphQLBoolean);

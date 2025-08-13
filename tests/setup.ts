@@ -477,7 +477,7 @@ export const createSharedUtilsMock = (customMocks = {}) => ({
         if (!type?.kind || type.kind !== 'NON_NULL') {
           return null; // No error - null is valid for nullable types
         } else {
-          return `Cannot be null for non-null type`;
+          return `Expected non-nullable type not to be null`;
         }
       }
 
@@ -487,15 +487,15 @@ export const createSharedUtilsMock = (customMocks = {}) => ({
       if (typeName === 'Int') {
         if (typeof value === 'number') {
           if (!Number.isInteger(value)) {
-            return `Int expects an integer, but received ${value}`;
+            return `Invalid value "${value}": Int cannot represent non-integer value: "${value}"`;
           }
         } else if (typeof value === 'string') {
           const num = Number(value);
           if (isNaN(num) || !Number.isInteger(num)) {
-            return `Int expects an integer, but received "${value}"`;
+            return `Invalid value "${value}": Int cannot represent non-integer value: "${value}"`;
           }
         } else {
-          return `Int expects an integer, but received ${typeof value}`;
+          return `Invalid value "${value}": Int cannot represent non-integer value: "${value}"`;
         }
       }
 
@@ -647,6 +647,150 @@ export const createSharedUtilsMock = (customMocks = {}) => ({
         }
       }
       return null;
+    },
+    validatePaginationValue: (argumentName: string, value: string) => {
+      const paginationArgs = ['first', 'last', 'limit', 'top', 'count'];
+      const MAX_PAGINATION_VALUE = 500;
+      if (paginationArgs.includes(argumentName.toLowerCase())) {
+        const numericValue = parseInt(value, 10);
+        if (!isNaN(numericValue) && numericValue > MAX_PAGINATION_VALUE) {
+          return {
+            valid: false,
+            error: `Pagination value for '${argumentName}' (${numericValue}) exceeds maximum of ${MAX_PAGINATION_VALUE}.`
+          };
+        }
+      }
+      return { valid: true };
+    },
+    validateFieldAddition: (schema: any, queryState: any, parentPath: string, fieldName: string, alias?: string) => {
+      // Mock that simulates proper field validation
+      if (!schema || !queryState) {
+        return { valid: false, error: 'Missing schema or query state' };
+      }
+      
+      // Basic name validation
+      if (!/^[_A-Za-z][_0-9A-Za-z]*$/.test(fieldName)) {
+        return { valid: false, error: `Invalid field name "${fieldName}". Must match /^[_A-Za-z][_0-9A-Za-z]*$/` };
+      }
+      
+      // For mock purposes, assume all valid GraphQL names are valid fields
+      // This allows tests to focus on testing the integration rather than schema validation
+      return { valid: true };
+    },
+    validateArgumentAddition: (schema: any, queryState: any, fieldPath: string, argumentName: string, value: any, isVariable: boolean = false) => {
+      // Mock that simulates proper argument validation
+      if (!schema || !queryState) {
+        return { valid: false, error: 'Missing schema or query state' };
+      }
+      
+      // Basic name validation
+      if (!/^[_A-Za-z][_0-9A-Za-z]*$/.test(argumentName)) {
+        return { valid: false, error: `Invalid argument name "${argumentName}". Must match /^[_A-Za-z][_0-9A-Za-z]*$/` };
+      }
+      
+      // Check if field exists in query structure (simplified mock)
+      if (!fieldPath || fieldPath === 'nonexistent') {
+        return { valid: false, error: `Field at path '${fieldPath}' not found in query structure. Add the field first.` };
+      }
+      
+      // For mock purposes, assume all valid arguments are acceptable
+      return { valid: true };
+    },
+    validateQueryStructure: (schema: any, queryState: any) => {
+      // Check for truly empty queries first 
+      if (!queryState || !queryState.queryStructure || !queryState.queryStructure.fields) {
+        return { 
+          valid: false, 
+          errors: ['Query is empty. Add fields to the query structure first.'], 
+          warnings: [] 
+        };
+      }
+      
+      if (Object.keys(queryState.queryStructure.fields).length === 0) {
+        return { 
+          valid: false, 
+          errors: ['Query is empty. Add fields to the query structure first.'], 
+          warnings: [] 
+        };
+      }
+      
+      // In test mode, let other validation handle specific errors for populated queries
+      return { valid: true, errors: [], warnings: [] };
+    },
+    navigateToQueryNode: (queryStructure: any, path: string) => {
+      if (!path) return queryStructure;
+      
+      let currentNode = queryStructure;
+      const pathParts = path.split('.');
+      
+      for (const part of pathParts) {
+        if (!currentNode.fields || !currentNode.fields[part]) {
+          return null;
+        }
+        currentNode = currentNode.fields[part];
+      }
+      
+      return currentNode;
+    },
+    getArgumentType: (schema: any, fieldPath: string, argumentName: string) => {
+      // Mock that returns argument types for known test cases
+      if (fieldPath === 'characters' && argumentName === 'page') {
+        return { name: 'Int', toString: () => 'Int' };
+      }
+      if (fieldPath === 'characters' && argumentName === 'includeImages') {
+        return { name: 'Boolean', toString: () => 'Boolean' };
+      }
+      if (fieldPath === 'characters' && argumentName === 'active') {
+        return { name: 'Boolean', toString: () => 'Boolean' };
+      }
+      if (fieldPath === 'character' && argumentName === 'id') {
+        return { name: 'ID', toString: () => 'ID' };
+      }
+      
+      // Default to String type for unknown arguments
+      return { name: 'String', toString: () => 'String' };
+    },
+    validateRequiredArguments: (schema: any, queryStructure: any, operationType: string = 'query') => {
+      // Mock that simulates required argument validation
+      return { valid: true, warnings: [] };
+    },
+    validateAgainstSchema: (queryString: string, schema: any) => {
+      // Mock schema validation that handles various test scenarios
+      if (!queryString || queryString.trim() === '') {
+        return { valid: false, errors: ['Query string is empty'] };
+      }
+      
+      // Handle different test scenarios based on query content
+      if (queryString.includes('nonExistent')) {
+        return { valid: false, errors: ["Cannot query field 'nonExistent' on type 'Query'."] };
+      }
+      
+      if (queryString.includes('invalidField')) {
+        return { valid: false, errors: ['Cannot query field "invalidField" on type "Query".'] };
+      }
+      
+      // Handle syntax errors
+      if (queryString.includes('query {  }') || queryString.includes('{ }')) {
+        return { valid: false, errors: ['Syntax Error: Expected Name, found }'] };
+      }
+      
+      // Handle multiple errors scenario
+      if (queryString.includes('nonExistent') && queryString.includes('alsoNotHere')) {
+        return { 
+          valid: false, 
+          errors: [
+            "Cannot query field 'nonExistent' on type 'Query'.",
+            "Cannot query field 'alsoNotHere' on type 'Query'."
+          ] 
+        };
+      }
+      
+      // Handle invalid variable types
+      if (queryString.includes('InvalidType')) {
+        return { valid: false, errors: ["Unknown type 'InvalidType'."] };
+      }
+      
+      return { valid: true };
     },
   },
   validateInputComplexity: vi.fn().mockReturnValue(null),

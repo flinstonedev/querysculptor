@@ -108,9 +108,30 @@ async function handler({ sessionId, fieldPath, argumentName, value }: SetTypedAr
         return { content: [{ type: 'text', text: JSON.stringify({ success: undefined, error: `Field at path '${fieldPath}' not found.` }) }] };
     }
 
-    // NOW, perform schema-aware validation
-    const argType = GraphQLValidationUtils.getArgumentType(schema, fieldPath, argumentName);
+    // Comprehensive incremental validation
+    const validation = GraphQLValidationUtils.validateArgumentAddition(
+        schema,
+        state,
+        fieldPath,
+        argumentName,
+        value,
+        typeof value === 'string' && value.startsWith('$')
+    );
 
+    if (!validation.valid) {
+        return {
+            content: [{
+                type: 'text',
+                text: JSON.stringify({
+                    success: undefined,
+                    error: validation.error,
+                })
+            }]
+        };
+    }
+
+    // Get argument type for coercion
+    const argType = GraphQLValidationUtils.getArgumentType(schema, fieldPath, argumentName);
     if (!argType) {
         return {
             content: [{
@@ -251,14 +272,22 @@ async function handler({ sessionId, fieldPath, argumentName, value }: SetTypedAr
         state.variablesDefaults
     );
 
+    // Build response with warnings if applicable
+    const response: any = {
+        success: true,
+        message: `Typed argument '${argumentName}' set to ${JSON.stringify(coercedValue)} at path '${fieldPath}'.`,
+        query,
+        queryStructure: state.queryStructure,
+    };
+
+    if (validation.warning) {
+        response.warning = validation.warning;
+    }
+
     return {
         content: [{
-            type: 'text', text: JSON.stringify({
-                success: true,
-                message: `Typed argument '${argumentName}' set to ${JSON.stringify(coercedValue)} at path '${fieldPath}'.`,
-                query,
-                queryStructure: state.queryStructure,
-            })
+            type: 'text', 
+            text: JSON.stringify(response)
         }]
     };
 }

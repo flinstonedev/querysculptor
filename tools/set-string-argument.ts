@@ -48,21 +48,33 @@ export async function setStringArgument(
             };
         }
 
-        // Validate argument against schema
+        // Comprehensive incremental validation
+        let validationWarning: string | undefined;
         try {
             const { fetchAndCacheSchema } = await import('./shared-utils.js');
             const schema = await fetchAndCacheSchema(queryState.headers);
-            if (schema) {
-                const argType = GraphQLValidationUtils.getArgumentType(schema, fieldPath, argumentName);
-                if (!argType) {
-                    return {
-                        error: `Argument '${argumentName}' not found on field '${fieldPath}'. Please check the schema documentation.`
-                    };
-                }
+            
+            const validation = GraphQLValidationUtils.validateArgumentAddition(
+                schema,
+                queryState,
+                fieldPath,
+                argumentName,
+                value,
+                false // String arguments are not variables
+            );
+
+            if (!validation.valid) {
+                return {
+                    error: validation.error
+                };
             }
+
+            validationWarning = validation.warning;
+
         } catch (error) {
-            // Schema validation failed, but continue anyway to maintain backward compatibility
-            console.warn(`Schema validation failed for argument ${argumentName}:`, error);
+            return {
+                error: `Schema validation failed: ${error instanceof Error ? error.message : String(error)}`
+            };
         }
 
         // Navigate to field in query structure
@@ -108,13 +120,13 @@ export async function setStringArgument(
         await saveQueryState(sessionId, queryState);
 
         let message = `String argument '${argumentName}' set to "${value}" at path '${fieldPath}'.`;
-        let warning = undefined;
+        let warning = validationWarning;
 
         // Add type coercion feedback and performance warnings
         if (!isEnum) {
             const coercedResult = GraphQLValidationUtils.coerceStringValue(value);
             if (coercedResult.coerced && coercedResult.warning) {
-                warning = coercedResult.warning;
+                warning = warning ? `${warning} ${coercedResult.warning}` : coercedResult.warning;
                 message += ` Auto-coerced to ${coercedResult.type}.`;
             }
 

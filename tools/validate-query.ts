@@ -6,6 +6,7 @@ import { parse, validate } from 'graphql';
 export async function validateGraphQLQuery(sessionId: string): Promise<{
     valid?: boolean;
     errors?: string[];
+    warnings?: string[];
     query?: string;
     error?: string;
     complexity?: {
@@ -24,54 +25,52 @@ export async function validateGraphQLQuery(sessionId: string): Promise<{
             };
         }
 
-        // Analyze query complexity first
-        const complexityAnalysis = analyzeQueryComplexity(
-            queryState.queryStructure,
-            queryState.operationType
-        );
-
-        if (!complexityAnalysis.valid) {
-            return {
-                valid: false,
-                errors: complexityAnalysis.errors,
-                complexity: {
-                    depth: complexityAnalysis.depth,
-                    fieldCount: complexityAnalysis.fieldCount,
-                    complexityScore: complexityAnalysis.complexityScore,
-                    warnings: complexityAnalysis.warnings,
-                }
-            };
-        }
-
-        // Build query string for validation
-        const queryString = buildQueryFromStructure(
-            queryState.queryStructure,
-            queryState.operationType,
-            queryState.variablesSchema,
-            queryState.operationName,
-            queryState.fragments
-        );
-
-        if (!queryString || queryString.trim() === '') {
-            return {
-                valid: false,
-                errors: ['Query is empty. Add fields to the query structure first.'],
-                query: queryString
-            };
-        }
-
-        // Validate the query using GraphQL validation utilities
+        // Use comprehensive query structure validation first
         try {
             const schema = await fetchAndCacheSchema(queryState.headers);
-            const validationResult = GraphQLValidationUtils.validateAgainstSchema(
-                queryString,
-                schema
-            );
+            const validation = GraphQLValidationUtils.validateQueryStructure(schema, queryState);
 
-            if (!validationResult.valid) {
+            // If query structure validation fails, return early
+            if (!validation.valid) {
                 return {
                     valid: false,
-                    errors: validationResult.errors || ['Unknown validation error'],
+                    errors: validation.errors,
+                    warnings: validation.warnings,
+                    query: buildQueryFromStructure(
+                        queryState.queryStructure,
+                        queryState.operationType,
+                        queryState.variablesSchema,
+                        queryState.operationName,
+                        queryState.fragments
+                    )
+                };
+            }
+
+            // Build query string for GraphQL validation
+            const queryString = buildQueryFromStructure(
+                queryState.queryStructure,
+                queryState.operationType,
+                queryState.variablesSchema,
+                queryState.operationName,
+                queryState.fragments
+            );
+
+            // Use GraphQL schema validation for detailed error reporting
+            const graphqlValidation = GraphQLValidationUtils.validateAgainstSchema(queryString, schema);
+            
+            // Get complexity analysis
+            const complexityAnalysis = analyzeQueryComplexity(
+                queryState.queryStructure,
+                queryState.operationType
+            );
+
+            const allWarnings = [...(validation.warnings || []), ...(complexityAnalysis.warnings || [])];
+
+            if (!graphqlValidation.valid) {
+                return {
+                    valid: false,
+                    errors: graphqlValidation.errors || ['Unknown validation error'],
+                    warnings: allWarnings,
                     query: queryString,
                     complexity: {
                         depth: complexityAnalysis.depth,
@@ -82,32 +81,10 @@ export async function validateGraphQLQuery(sessionId: string): Promise<{
                 };
             }
 
-            // Check for missing required arguments
-            if (GraphQLValidationUtils.validateRequiredArguments) {
-                const requiredArgsValidation = GraphQLValidationUtils.validateRequiredArguments(
-                    schema,
-                    queryState.queryStructure,
-                    queryState.operationType
-                );
-
-                if (requiredArgsValidation.warnings.length > 0) {
-                    return {
-                        valid: false,
-                        errors: requiredArgsValidation.warnings,
-                        query: queryString,
-                        complexity: {
-                            depth: complexityAnalysis.depth,
-                            fieldCount: complexityAnalysis.fieldCount,
-                            complexityScore: complexityAnalysis.complexityScore,
-                            warnings: complexityAnalysis.warnings,
-                        }
-                    };
-                }
-            }
-        } catch (schemaError) {
             return {
-                valid: false,
-                errors: [`Schema validation failed: ${schemaError instanceof Error ? schemaError.message : String(schemaError)}`],
+                valid: true,
+                errors: [],
+                warnings: allWarnings,
                 query: queryString,
                 complexity: {
                     depth: complexityAnalysis.depth,
@@ -116,18 +93,19 @@ export async function validateGraphQLQuery(sessionId: string): Promise<{
                     warnings: complexityAnalysis.warnings,
                 }
             };
+        } catch (schemaError) {
+            return {
+                valid: false,
+                errors: [`Schema validation failed: ${schemaError instanceof Error ? schemaError.message : String(schemaError)}`],
+                query: buildQueryFromStructure(
+                    queryState.queryStructure,
+                    queryState.operationType,
+                    queryState.variablesSchema,
+                    queryState.operationName,
+                    queryState.fragments
+                )
+            };
         }
-
-        return {
-            valid: true,
-            query: queryString,
-            complexity: {
-                depth: complexityAnalysis.depth,
-                fieldCount: complexityAnalysis.fieldCount,
-                complexityScore: complexityAnalysis.complexityScore,
-                warnings: complexityAnalysis.warnings,
-            }
-        };
     } catch (error) {
         return {
             error: error instanceof Error ? error.message : String(error)

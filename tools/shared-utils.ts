@@ -274,7 +274,7 @@ export class GraphQLValidationUtils {
     static validateValueAgainstType(value: any, type: any): string | null {
         if (isNonNullType(type)) {
             if (value === null || value === undefined) {
-                return `Type ${type} is non-nullable, but received null/undefined.`;
+                return `Expected non-nullable type not to be null`;
             }
             return this.validateValueAgainstType(value, type.ofType);
         }
@@ -302,7 +302,7 @@ export class GraphQLValidationUtils {
                     // Enhanced Int validation with type coercion for protocol compatibility
                     const coercedIntValue = this.coerceToInteger(value);
                     if (coercedIntValue === null) {
-                        return `Type Int expects an integer, but received ${String(value)}.`;
+                        return `Invalid value "${String(value)}": Int cannot represent non-integer value: "${String(value)}"`;
                     }
                     break;
                 case 'Float':
@@ -726,6 +726,303 @@ export class GraphQLValidationUtils {
             console.warn('Error getting argument type:', error);
             return null;
         }
+    }
+
+    /**
+     * Validates that a field can be added at the specified path in the query structure.
+     * This ensures incremental query building maintains validity.
+     */
+    static validateFieldAddition(
+        schema: GraphQLSchema,
+        queryState: QueryState,
+        parentPath: string,
+        fieldName: string,
+        alias?: string
+    ): { valid: boolean; error?: string; warning?: string } {
+        try {
+            // Basic name validation
+            if (!this.isValidGraphQLName(fieldName)) {
+                return {
+                    valid: false,
+                    error: `Invalid field name "${fieldName}". Must match /^[_A-Za-z][_0-9A-Za-z]*$/`
+                };
+            }
+
+            // Alias validation
+            if (alias) {
+                const aliasValidation = this.validateFieldAlias(alias);
+                if (!aliasValidation.valid) {
+                    return {
+                        valid: false,
+                        error: aliasValidation.error
+                    };
+                }
+            }
+
+            // Navigate to parent type in schema
+            let currentType: GraphQLObjectType | GraphQLInterfaceType | null = null;
+            
+            // Determine root type based on operation
+            switch (queryState.operationType.toLowerCase()) {
+                case 'query':
+                    currentType = schema.getQueryType() || null;
+                    break;
+                case 'mutation':
+                    currentType = schema.getMutationType() || null;
+                    break;
+                case 'subscription':
+                    currentType = schema.getSubscriptionType() || null;
+                    break;
+            }
+
+            if (!currentType) {
+                return {
+                    valid: false,
+                    error: `No ${queryState.operationType} type defined in schema`
+                };
+            }
+
+            // Navigate through path if specified
+            if (parentPath) {
+                const pathParts = parentPath.split('.');
+                for (const part of pathParts) {
+                    if (!currentType || (!isObjectType(currentType) && !isInterfaceType(currentType))) {
+                        return {
+                            valid: false,
+                            error: `Cannot traverse path '${parentPath}': type '${(currentType as any)?.name || 'unknown'}' is not an object or interface type`
+                        };
+                    }
+
+                    const fields: any = currentType.getFields();
+                    const field: any = fields[part];
+                    if (!field) {
+                        const availableFields = Object.keys(fields).slice(0, 5).join(', ');
+                        return {
+                            valid: false,
+                            error: `Field '${part}' not found on type '${currentType.name}'. Available fields: ${availableFields}`
+                        };
+                    }
+
+                    const fieldType: any = getNamedType(field.type);
+                    if (isObjectType(fieldType) || isInterfaceType(fieldType)) {
+                        currentType = fieldType;
+                    } else {
+                        return {
+                            valid: false,
+                            error: `Cannot select subfields on scalar/enum field '${part}' of type '${fieldType.name}'`
+                        };
+                    }
+                }
+            }
+
+            // Validate field exists on target type
+            if (!currentType || (!isObjectType(currentType) && !isInterfaceType(currentType))) {
+                return {
+                    valid: false,
+                    error: 'Cannot determine target type for field validation'
+                };
+            }
+
+            const fields = currentType.getFields();
+            if (!fields[fieldName]) {
+                const suggestion = this.findSimilarName(fieldName, Object.keys(fields));
+                let error = `Field '${fieldName}' not found on type '${currentType.name}'.`;
+                if (suggestion) {
+                    error += ` Did you mean '${suggestion}'?`;
+                } else {
+                    const availableFields = Object.keys(fields).slice(0, 5).join(', ');
+                    error += ` Available fields: ${availableFields}`;
+                }
+                return { valid: false, error };
+            }
+
+            // Check for field conflicts in query structure
+            const targetNode = this.navigateToQueryNode(queryState.queryStructure, parentPath);
+            if (targetNode && targetNode.fields) {
+                const key = alias || fieldName;
+                if (targetNode.fields[key] && targetNode.fields[key].fieldName !== fieldName) {
+                    return {
+                        valid: false,
+                        error: `Alias conflict: '${key}' is already used for field '${targetNode.fields[key].fieldName}'. Choose a different alias.`
+                    };
+                }
+            }
+
+            return { valid: true };
+        } catch (error) {
+            return {
+                valid: false,
+                error: `Field validation failed: ${error instanceof Error ? error.message : String(error)}`
+            };
+        }
+    }
+
+    /**
+     * Validates that an argument can be set on a field with the given value.
+     */
+    static validateArgumentAddition(
+        schema: GraphQLSchema,
+        queryState: QueryState,
+        fieldPath: string,
+        argumentName: string,
+        value: any,
+        isVariable: boolean = false
+    ): { valid: boolean; error?: string; warning?: string } {
+        try {
+            // Basic name validation
+            if (!this.isValidGraphQLName(argumentName)) {
+                return {
+                    valid: false,
+                    error: `Invalid argument name "${argumentName}". Must match /^[_A-Za-z][_0-9A-Za-z]*$/`
+                };
+            }
+
+            // Verify field exists in query structure
+            const fieldNode = this.navigateToQueryNode(queryState.queryStructure, fieldPath);
+            if (!fieldNode) {
+                return {
+                    valid: false,
+                    error: `Field at path '${fieldPath}' not found in query structure. Add the field first.`
+                };
+            }
+
+            // Get argument definition from schema
+            const argType = this.getArgumentType(schema, fieldPath, argumentName);
+            if (!argType) {
+                return {
+                    valid: false,
+                    error: `Argument '${argumentName}' not found on field '${fieldPath}'. Check the schema documentation.`
+                };
+            }
+
+            // Skip value validation for variable references
+            if (isVariable || (typeof value === 'string' && value.startsWith('$'))) {
+                return { valid: true };
+            }
+
+            // Handle special case of string "null" conversion before validation
+            let valueToValidate = value;
+            if (typeof value === 'string' && value.toLowerCase() === 'null') {
+                valueToValidate = null;
+            }
+
+            // Validate value against argument type
+            const valueError = this.validateValueAgainstType(valueToValidate, argType);
+            if (valueError) {
+                return {
+                    valid: false,
+                    error: `Invalid value for argument '${argumentName}'. Reason: ${valueError}`
+                };
+            }
+
+            // Generate warnings
+            const warnings: string[] = [];
+            
+            // Performance warnings
+            const perfWarning = this.generatePerformanceWarning(argumentName, value);
+            if (perfWarning) warnings.push(perfWarning);
+
+            // Pagination validation
+            const paginationValidation = this.validatePaginationValue(argumentName, String(value));
+            if (!paginationValidation.valid) {
+                return { valid: false, error: paginationValidation.error };
+            }
+
+            return { 
+                valid: true,
+                warning: warnings.length > 0 ? warnings.join(' ') : undefined
+            };
+        } catch (error) {
+            return {
+                valid: false,
+                error: `Argument validation failed: ${error instanceof Error ? error.message : String(error)}`
+            };
+        }
+    }
+
+    /**
+     * Validates the entire query structure for completeness and correctness.
+     * This is called before query execution or when explicitly requested.
+     */
+    static validateQueryStructure(
+        schema: GraphQLSchema,
+        queryState: QueryState
+    ): { valid: boolean; errors: string[]; warnings: string[] } {
+        const errors: string[] = [];
+        const warnings: string[] = [];
+
+        try {
+            // Check for empty query
+            if (!queryState.queryStructure.fields || Object.keys(queryState.queryStructure.fields).length === 0) {
+                errors.push('Query is empty. Add at least one field to the query.');
+                return { valid: false, errors, warnings };
+            }
+
+            // Validate query complexity
+            const complexityAnalysis = analyzeQueryComplexity(queryState.queryStructure, queryState.operationType);
+            if (!complexityAnalysis.valid) {
+                errors.push(...complexityAnalysis.errors);
+            }
+            warnings.push(...complexityAnalysis.warnings);
+
+            // Validate required arguments
+            const requiredArgsValidation = this.validateRequiredArguments(
+                schema,
+                queryState.queryStructure,
+                queryState.operationType
+            );
+            if (!requiredArgsValidation.valid) {
+                errors.push(...requiredArgsValidation.warnings);
+            }
+
+            // Build and validate query syntax
+            const queryString = buildQueryFromStructure(
+                queryState.queryStructure,
+                queryState.operationType,
+                queryState.variablesSchema,
+                queryState.operationName,
+                queryState.fragments
+            );
+
+            if (queryString.trim() === '') {
+                errors.push('Generated query is empty.');
+                return { valid: false, errors, warnings };
+            }
+
+            // Validate against schema
+            const schemaValidation = this.validateAgainstSchema(queryString, schema);
+            if (!schemaValidation.valid) {
+                errors.push(...(schemaValidation.errors || []));
+            }
+
+            return {
+                valid: errors.length === 0,
+                errors,
+                warnings
+            };
+        } catch (error) {
+            errors.push(`Query structure validation failed: ${error instanceof Error ? error.message : String(error)}`);
+            return { valid: false, errors, warnings };
+        }
+    }
+
+    /**
+     * Helper to navigate to a specific node in the query structure.
+     */
+    static navigateToQueryNode(queryStructure: any, path: string): any | null {
+        if (!path) return queryStructure;
+        
+        let currentNode = queryStructure;
+        const pathParts = path.split('.');
+        
+        for (const part of pathParts) {
+            if (!currentNode.fields || !currentNode.fields[part]) {
+                return null;
+            }
+            currentNode = currentNode.fields[part];
+        }
+        
+        return currentNode;
     }
 
     static validateRequiredArguments(
