@@ -697,27 +697,43 @@ export class GraphQLValidationUtils {
             const pathParts = fieldPath.split('.').filter(p => p);
             if (pathParts.length === 0) return null;
 
-            let currentType: GraphQLObjectType | GraphQLInterfaceType | null = schema.getQueryType() || null;
-            if (!currentType) return null;
+            const rootTypes: Array<GraphQLObjectType | null> = [
+                schema.getQueryType() || null,
+                schema.getMutationType() || null,
+                schema.getSubscriptionType() || null,
+            ];
 
-            // Navigate through the path to find the field
-            for (let i = 0; i < pathParts.length; i++) {
-                const fieldName = pathParts[i];
-                const field: any = currentType.getFields()[fieldName];
-                if (!field) return null;
+            for (const root of rootTypes) {
+                if (!root) continue;
+                let currentType: GraphQLObjectType | GraphQLInterfaceType | null = root;
 
-                if (i === pathParts.length - 1) {
-                    // This is the target field, look for the argument
-                    const arg = field.args.find((a: any) => a.name === argumentName);
-                    return arg ? (arg.type as GraphQLInputType) : null;
-                } else {
-                    // Navigate deeper
-                    const fieldType: any = getNamedType(field.type);
-                    if (isObjectType(fieldType) || isInterfaceType(fieldType)) {
-                        currentType = fieldType;
+                let failed = false;
+                for (let i = 0; i < pathParts.length; i++) {
+                    const fieldName = pathParts[i];
+                    const field: any = currentType.getFields()[fieldName];
+                    if (!field) { failed = true; break; }
+
+                    if (i === pathParts.length - 1) {
+                        const arg = field.args.find((a: any) => a.name === argumentName);
+                        if (arg) {
+                            return arg.type as GraphQLInputType;
+                        } else {
+                            failed = true;
+                            break;
+                        }
                     } else {
-                        return null;
+                        const fieldType: any = getNamedType(field.type);
+                        if (isObjectType(fieldType) || isInterfaceType(fieldType)) {
+                            currentType = fieldType;
+                        } else {
+                            failed = true;
+                            break;
+                        }
                     }
+                }
+
+                if (!failed) {
+                    // If traversal succeeded but argument not found, keep searching other roots
                 }
             }
 
@@ -761,7 +777,7 @@ export class GraphQLValidationUtils {
 
             // Navigate to parent type in schema
             let currentType: GraphQLObjectType | GraphQLInterfaceType | null = null;
-            
+
             // Determine root type based on operation
             switch (queryState.operationType.toLowerCase()) {
                 case 'query':
@@ -917,7 +933,7 @@ export class GraphQLValidationUtils {
 
             // Generate warnings
             const warnings: string[] = [];
-            
+
             // Performance warnings
             const perfWarning = this.generatePerformanceWarning(argumentName, value);
             if (perfWarning) warnings.push(perfWarning);
@@ -928,7 +944,7 @@ export class GraphQLValidationUtils {
                 return { valid: false, error: paginationValidation.error };
             }
 
-            return { 
+            return {
                 valid: true,
                 warning: warnings.length > 0 ? warnings.join(' ') : undefined
             };
@@ -975,13 +991,15 @@ export class GraphQLValidationUtils {
                 errors.push(...requiredArgsValidation.warnings);
             }
 
-            // Build and validate query syntax
+            // Build and validate query syntax (include operation directives and variable defaults)
             const queryString = buildQueryFromStructure(
                 queryState.queryStructure,
                 queryState.operationType,
                 queryState.variablesSchema,
                 queryState.operationName,
-                queryState.fragments
+                queryState.fragments,
+                queryState.operationDirectives,
+                queryState.variablesDefaults
             );
 
             if (queryString.trim() === '') {
@@ -1011,17 +1029,17 @@ export class GraphQLValidationUtils {
      */
     static navigateToQueryNode(queryStructure: any, path: string): any | null {
         if (!path) return queryStructure;
-        
+
         let currentNode = queryStructure;
         const pathParts = path.split('.');
-        
+
         for (const part of pathParts) {
             if (!currentNode.fields || !currentNode.fields[part]) {
                 return null;
             }
             currentNode = currentNode.fields[part];
         }
-        
+
         return currentNode;
     }
 

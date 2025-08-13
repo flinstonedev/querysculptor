@@ -46,18 +46,20 @@ export async function validateGraphQLQuery(sessionId: string): Promise<{
                 };
             }
 
-            // Build query string for GraphQL validation
+            // Build query string for GraphQL validation (include operation directives and variable defaults)
             const queryString = buildQueryFromStructure(
                 queryState.queryStructure,
                 queryState.operationType,
                 queryState.variablesSchema,
                 queryState.operationName,
-                queryState.fragments
+                queryState.fragments,
+                queryState.operationDirectives,
+                queryState.variablesDefaults
             );
 
             // Use GraphQL schema validation for detailed error reporting
             const graphqlValidation = GraphQLValidationUtils.validateAgainstSchema(queryString, schema);
-            
+
             // Get complexity analysis
             const complexityAnalysis = analyzeQueryComplexity(
                 queryState.queryStructure,
@@ -102,7 +104,9 @@ export async function validateGraphQLQuery(sessionId: string): Promise<{
                     queryState.operationType,
                     queryState.variablesSchema,
                     queryState.operationName,
-                    queryState.fragments
+                    queryState.fragments,
+                    queryState.operationDirectives,
+                    queryState.variablesDefaults
                 )
             };
         }

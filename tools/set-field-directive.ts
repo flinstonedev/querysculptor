@@ -49,17 +49,16 @@ export async function setFieldDirective(
             };
         }
 
-        if (argumentName) {
-            try {
-                const schema = await fetchAndCacheSchema(queryState.headers);
-                const directive = schema.getDirective(directiveName);
+        try {
+            const schema = await fetchAndCacheSchema(queryState.headers);
+            const directive = schema.getDirective(directiveName);
 
-                if (!directive) {
-                    return { error: `Directive '@${directiveName}' not found in the schema.` };
-                }
+            if (!directive) {
+                return { error: `Directive '@${directiveName}' not found in the schema.` };
+            }
 
+            if (argumentName) {
                 const argDef = directive.args.find(a => a.name === argumentName);
-
                 if (!argDef) {
                     return { error: `Argument '${argumentName}' not found on directive '@${directiveName}'.` };
                 }
@@ -80,17 +79,16 @@ export async function setFieldDirective(
                     if (!isTypeSubTypeOf(schema, varGqlType, argDef.type)) {
                         return { error: `Variable '${variableName}' of type '${variableTypeStr}' cannot be used for argument '${argumentName}' of type '${argDef.type.toString()}'.` };
                     }
-                } else {
+                } else if (argumentValue !== undefined) {
                     // It's a literal value
                     const validationError = GraphQLValidationUtils.validateValueAgainstType(argumentValue, argDef.type);
                     if (validationError) {
                         return { error: `For argument '${argumentName}' on directive '@${directiveName}': ${validationError}` };
                     }
                 }
-
-            } catch (e: any) {
-                return { error: `Directive argument validation failed: ${e.message}` };
             }
+        } catch (e: any) {
+            return { error: `Directive argument validation failed: ${e.message}` };
         }
 
         // Navigate to field in query structure

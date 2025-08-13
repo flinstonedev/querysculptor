@@ -34,7 +34,7 @@ export async function executeGraphQLQuery(sessionId: string): Promise<{
                 queryState.operationName,
                 queryState.fragments || {},
                 queryState.operationDirectives || [],
-                queryState.variablesValues || {}
+                queryState.variablesDefaults || {}
             );
         } catch (buildError: any) {
             return { error: `Failed to build query: ${buildError.message}` };

@@ -4,55 +4,53 @@ import * as sharedUtils from '../../tools/shared-utils';
 
 vi.mock('../../tools/shared-utils', async () => {
     const { createSharedUtilsMock } = await import('../core/setup');
-    const { buildSchema } = await import('graphql');
+    const { buildSchema, getNamedType, isObjectType, isInterfaceType } = await import('graphql');
     const actualUtils = await vi.importActual('../../tools/shared-utils');
 
     const testSchema = buildSchema(`
-        input UserInput {
-            name: String
-            age: Int
-            active: Boolean
-            profile: ProfileInput
-        }
-        
-        input ProfileInput {
-            name: String
-            age: Int
-        }
-        
-        input FilterInput {
-            name: String
-            status: String
-            species: String
-            origin: OriginInput
-        }
-        
-        input OriginInput {
-            name: String
-        }
-        
-        type User {
-            id: ID!
-            name: String
-        }
-        
-        type Mutation {
-            updateUser(input: UserInput, filter: FilterInput): User
-        }
-        
-        type Query {
-            user: User
-        }
+        input UserInput { name: String, age: Int, active: Boolean, profile: ProfileInput }
+        input ProfileInput { name: String, age: Int }
+        input FilterInput { name: String, status: String, species: String, origin: OriginInput }
+        input OriginInput { name: String }
+        type User { id: ID!, name: String }
+        type Mutation { updateUser(input: UserInput, filter: FilterInput): User }
+        type Query { user: User }
     `);
 
+    const base = createSharedUtilsMock({
+        fetchAndCacheSchema: vi.fn().mockResolvedValue(testSchema),
+        loadQueryState: vi.fn(),
+        saveQueryState: vi.fn(),
+    });
+
     return {
-        ...createSharedUtilsMock({
-            fetchAndCacheSchema: vi.fn().mockResolvedValue(testSchema),
-            loadQueryState: vi.fn(),
-            saveQueryState: vi.fn(),
-        }),
+        ...base,
         buildQueryFromStructure: actualUtils.buildQueryFromStructure,
         validateInputComplexity: vi.fn().mockReturnValue(null),
+        GraphQLValidationUtils: {
+            ...base.GraphQLValidationUtils,
+            getArgumentType: (schema: any, fieldPath: string, argumentName: string) => {
+                const tryRoot = (root: any) => {
+                    if (!root) return null;
+                    let current: any = root;
+                    const parts = fieldPath.split('.').filter(Boolean);
+                    for (let i = 0; i < parts.length; i++) {
+                        const f = current.getFields()[parts[i]];
+                        if (!f) return null;
+                        if (i === parts.length - 1) {
+                            const arg = f.args.find((a: any) => a.name === argumentName);
+                            return arg ? arg.type : null;
+                        }
+                        const nt = getNamedType(f.type);
+                        if (isObjectType(nt) || isInterfaceType(nt)) current = nt; else return null;
+                    }
+                    return null;
+                };
+                return tryRoot(schema.getMutationType())
+                    || tryRoot(schema.getQueryType())
+                    || tryRoot(schema.getSubscriptionType());
+            },
+        },
     };
 });
 
