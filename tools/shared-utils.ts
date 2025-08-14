@@ -53,9 +53,12 @@ let lastRedisInitAttempt = 0;
 
 // Configurable TTL and retry interval
 const SESSION_TTL_SECONDS = (() => {
-    const value = parseInt(process.env.SESSION_TTL_SECONDS || '3600', 10);
-    return isNaN(value) || value <= 0 ? 3600 : value;
+    const raw = process.env.SESSION_TTL_SECONDS;
+    if (raw === undefined) return 3600; // default 1 hour
+    const value = parseInt(raw, 10);
+    return isNaN(value) ? 3600 : value; // allow 0 => no expiry
 })();
+const HAS_SESSION_TTL = SESSION_TTL_SECONDS > 0;
 
 const REDIS_RETRY_INTERVAL_MS = (() => {
     const value = parseInt(process.env.REDIS_RETRY_INTERVAL_MS || '30000', 10);
@@ -182,6 +185,10 @@ async function withRedisRetry<T>(label: string, op: () => Promise<T>): Promise<T
             await delay(sleep);
         }
     }
+}
+
+function normalizeSessionId(sessionId: string): string {
+    return (sessionId || '').trim();
 }
 
 // Schema caching

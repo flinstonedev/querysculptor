@@ -21,6 +21,9 @@ export async function selectGraphQLField(
     error?: string;
 }> {
     try {
+        if (!sessionId || typeof sessionId !== 'string' || sessionId.trim() === '') {
+            return { error: 'Invalid sessionId.' };
+        }
         // Validate field alias syntax
         const aliasValidation = GraphQLValidationUtils.validateFieldAlias(alias || null);
         if (!aliasValidation.valid) {

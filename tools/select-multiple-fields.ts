@@ -15,6 +15,9 @@ export async function selectMultipleFields(
     error?: string;
 }> {
     try {
+        if (!sessionId || typeof sessionId !== 'string' || sessionId.trim() === '') {
+            return { error: 'Invalid sessionId.' };
+        }
         // Validate field names syntax
         for (const fieldName of fieldNames) {
             if (!GraphQLValidationUtils.isValidGraphQLName(fieldName)) {

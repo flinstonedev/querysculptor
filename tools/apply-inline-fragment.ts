@@ -16,6 +16,9 @@ export async function applyInlineFragment(
     error?: string;
 }> {
     try {
+        if (!sessionId || typeof sessionId !== 'string' || sessionId.trim() === '') {
+            return { error: 'Invalid sessionId.' };
+        }
         // Load query state
         const queryState = await loadQueryState(sessionId);
         if (!queryState) {
