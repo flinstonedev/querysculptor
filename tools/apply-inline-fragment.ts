@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { QueryState, loadQueryState, saveQueryState } from "./shared-utils.js";
+import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils } from "./shared-utils.js";
 
 // Core business logic - testable function
 export async function applyInlineFragment(
@@ -88,16 +88,19 @@ export const applyInlineFragmentTool = {
     schema: z.object({
         sessionId: z.string().describe('The session ID from start-query-session.'),
         parentPath: z.string().default("").describe('Dot-notation path where the inline fragment should be applied (e.g., "user", "" for root).'),
-        onType: z.string().describe('The type condition for the inline fragment (e.g., "Admin").'),
+        onType: z.string().optional().describe('The type condition for the inline fragment (e.g., "Repository").'),
+        typeName: z.string().optional().describe('Alias of onType for compatibility with some agents.'),
         fieldNames: z.array(z.string()).describe('Array of field names to select in the inline fragment.'),
-    }),
-    handler: async ({ sessionId, parentPath = "", onType, fieldNames }: {
+    }).refine((data) => !!(data.onType || data.typeName), { message: 'onType (or typeName) is required' }),
+    handler: async ({ sessionId, parentPath = "", onType, typeName, fieldNames }: {
         sessionId: string,
         parentPath?: string,
-        onType: string,
+        onType?: string,
+        typeName?: string,
         fieldNames: string[]
     }) => {
-        const result = await applyInlineFragment(sessionId, parentPath, onType, fieldNames);
+        const resolvedOnType = (onType || typeName || '').trim();
+        const result = await applyInlineFragment(sessionId, parentPath, resolvedOnType, sanitizeInlineFields(fieldNames));
 
         return {
             content: [{
@@ -106,4 +109,9 @@ export const applyInlineFragmentTool = {
             }],
         };
     }
-}; 
+};
+
+function sanitizeInlineFields(fieldNames: string[]): string[] {
+    // Normalize fields like "owner { login }" -> keeps as original token; parser will handle nesting
+    return fieldNames.map(f => (typeof f === 'string' ? f.trim() : f)).filter(Boolean) as string[];
+}

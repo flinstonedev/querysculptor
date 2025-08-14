@@ -1560,7 +1560,9 @@ export function buildSelectionSet(fields: Record<string, any>, indent = '  '): s
             fieldData.inlineFragments.forEach((inlineFrag: any) => {
                 if (inlineFrag.on_type && inlineFrag.selections && Object.keys(inlineFrag.selections).length > 0) {
                     if (subSelectionContent && !subSelectionContent.endsWith('\n')) subSelectionContent += '\n';
-                    const inlineFragSelectionStr = buildSelectionSet(inlineFrag.selections, indent + '    ');
+                    // Support primitive string fields inside inline fragments for nested syntax like "owner { login }"
+                    const selections = normalizeSelections(inlineFrag.selections);
+                    const inlineFragSelectionStr = buildSelectionSet(selections, indent + '    ');
                     subSelectionContent += `${indent + '  '}... on ${inlineFrag.on_type} {\n${inlineFragSelectionStr}\n${indent + '  '}}`;
                 }
             });
@@ -1572,6 +1574,46 @@ export function buildSelectionSet(fields: Record<string, any>, indent = '  '): s
 
         return fieldString;
     }).join('\n');
+}
+
+function normalizeSelections(selections: Record<string, any>): Record<string, any> {
+    const normalized: Record<string, any> = {};
+    for (const [key, val] of Object.entries(selections)) {
+        if (typeof key === 'string' && key.includes('{')) {
+            // This case typically won't occur since keys are field names; handle values as strings below
+        }
+        if (typeof val === 'string') {
+            // Parse shorthand like "owner { login }"
+            const m = val.match(/^([^\s{]+)\s*\{\s*([^}]+)\s*\}$/);
+            if (m) {
+                const parent = m[1];
+                const children = m[2].split(',').map(s => s.trim()).filter(Boolean);
+                normalized[parent] = normalized[parent] || {
+                    fieldName: parent,
+                    alias: null,
+                    args: {},
+                    fields: {},
+                    directives: [],
+                    fragmentSpreads: [],
+                    inlineFragments: []
+                };
+                for (const child of children) {
+                    normalized[parent].fields[child] = {
+                        fieldName: child,
+                        alias: null,
+                        args: {},
+                        fields: {},
+                        directives: [],
+                        fragmentSpreads: [],
+                        inlineFragments: []
+                    };
+                }
+                continue;
+            }
+        }
+        normalized[key] = val;
+    }
+    return normalized;
 }
 
 export const MAX_INPUT_COMPLEXITY = {
