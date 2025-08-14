@@ -8,55 +8,52 @@ start-query-session → introspect-schema → build query → validate-query →
 ## Tool Quick Reference
 
 ### Session (Required First)
-- `start-query-session` - Create session with endpoint/headers
-- `get-query-state` - Debug current state
+- `start-query-session` - Create session
+- `get-current-query` - View current query text and variables
+- `get-root-operation-types` - Discover root operation types
 - `end-query-session` - Cleanup
 
-### Schema (Required Early)  
-- `introspect-schema` - Get all types/fields (run after session start)
-- `search-schema` - Find types/fields by name
-- `get-field-details` - Check field arguments/requirements
+### Schema (Required Early)
+- `introspect-schema` - Get all types/fields
+- `get-type-info` - Inspect a type
+- `get-field-info` - Field args/return type
 - `get-input-object-help` - Mutation input structure
 
 ### Building
 - `select-field` - Add single field
-- `select-multiple-fields` - Add multiple fields
+- `select-multi-fields` - Add multiple fields
+- `get-selections` - Available fields/inline fragments at a path
 - `set-string-argument` - String/enum args
-- `set-typed-argument` - Number/boolean/object args  
+- `set-typed-argument` - Number/boolean/object args
 - `set-input-object-argument` - Complex nested inputs
+- `set-variable-argument` - Use variable in field
 
 ### Variables
-- `add-variable` - Define variable
+- `set-query-variable` - Define variable (+optional default)
 - `set-variable-value` - Set value
-- `set-variable-argument` - Use variable in field
+- `remove-query-variable` - Remove variable
 
 ### Final Steps
 - `validate-query` - Check query validity
 - `execute-query` - Run query
-- `get-query-string` - View GraphQL text
+- `get-current-query` - View GraphQL text
 
-## Common Patterns
-
-**Basic Query:**
+## Unions/Interfaces (Inline Fragments)
+- When validation says a field is not on a union/interface member, use `apply-inline-frag` at the correct parent path.
+- Example:
 ```
-start-query-session(endpoint) → introspect-schema → select-field("user") → 
-set-string-argument("user", "id", "123") → validate-query → execute-query
-```
-
-**Mutation:**
-```
-start-query-session → introspect-schema → get-input-object-help("UserInput") →
-select-field("createUser") → set-input-object-argument("createUser", "input", {...}) →
-validate-query → execute-query
+parentPath: "search.edges.node"
+typeName: "Repository"
+fieldNames: ["name", "owner { login }", "stargazers { totalCount }", "url"]
 ```
 
 ## Error Handling
-- Always check response.error field
-- validate-query before execute-query
-- Use get-query-state for debugging
-- Re-run introspect-schema if schema issues
+- Always check `response.error`
+- Use `validate-query` before `execute-query`
+- Use `get-current-query` and `get-selections` for debugging
+- Re-run `introspect-schema` if schema issues
 
 ## Response Format
-- Success: `{success: true, data...}`
+- Success: `{success: true, ...}`
 - Error: `{error: "message"}`
-- Warning: `{success: true, warning: "message"}`
+- Warning: `{success: true, warning: "message", ...}`
