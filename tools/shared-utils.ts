@@ -1323,32 +1323,41 @@ export function generateSessionId(): string {
 export async function saveQueryState(sessionId: string, queryState: QueryState): Promise<void> {
     const serializableData = { ...queryState };
     await withRedisRetry('saveQueryState', async () => {
-        const sessionKey = `querystate:${sessionId}`;
-        await redis.setEx(sessionKey, SESSION_TTL_SECONDS, JSON.stringify(serializableData));
-        console.log(`Session ${sessionId} saved to Redis`);
+        const normalizedId = normalizeSessionId(sessionId);
+        const sessionKey = `querystate:${normalizedId}`;
+        if (HAS_SESSION_TTL) {
+            await redis.setEx(sessionKey, SESSION_TTL_SECONDS, JSON.stringify(serializableData));
+        } else {
+            await redis.set(sessionKey, JSON.stringify(serializableData));
+        }
+        console.log(`Session ${normalizedId} saved to Redis`);
     });
 }
 
 export async function loadQueryState(sessionId: string): Promise<QueryState | null> {
-    const sessionKey = `querystate:${sessionId}`;
+    const normalizedId = normalizeSessionId(sessionId);
+    const sessionKey = `querystate:${normalizedId}`;
     return await withRedisRetry('loadQueryState', async () => {
         const data = await redis.get(sessionKey);
         if (!data) {
-            console.log(`Session ${sessionId} not found in Redis`);
+            console.log(`Session ${normalizedId} not found in Redis`);
             return null;
         }
         const jsonString = typeof data === 'string' ? data : (data as Buffer).toString();
         const queryState = JSON.parse(jsonString);
-        console.log(`Session ${sessionId} loaded from Redis`);
-        try {
-            await redis.expire(sessionKey, SESSION_TTL_SECONDS);
-        } catch { }
+        console.log(`Session ${normalizedId} loaded from Redis`);
+        if (HAS_SESSION_TTL) {
+            try {
+                await redis.expire(sessionKey, SESSION_TTL_SECONDS);
+            } catch { }
+        }
         return queryState;
     });
 }
 
 export async function deleteQueryState(sessionId: string): Promise<boolean> {
-    const sessionKey = `querystate:${sessionId}`;
+    const normalizedId = normalizeSessionId(sessionId);
+    const sessionKey = `querystate:${normalizedId}`;
     return await withRedisRetry('deleteQueryState', async () => {
         const result = await redis.del(sessionKey);
         return (result as number) > 0;
