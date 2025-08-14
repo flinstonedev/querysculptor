@@ -40,36 +40,80 @@ config({ path: '.env' });
 const redis = createClient({
     url: process.env.REDIS_URL || 'redis://localhost:6379',
     socket: {
-        reconnectStrategy: false,
-        connectTimeout: 1000,
+        // Implement a bounded exponential backoff reconnect strategy
+        reconnectStrategy: (retries: number) => Math.min(1000 * Math.pow(2, retries), 15000),
+        connectTimeout: 2000,
     }
 });
 
-// Fallback in-memory storage
-const memoryStorage = new Map<string, any>();
 let useRedis = false;
 let redisConnectionAttempted = false;
 let redisConnectionPromise: Promise<void> | null = null;
+let lastRedisInitAttempt = 0;
+
+// Configurable TTL and retry interval
+const SESSION_TTL_SECONDS = (() => {
+    const value = parseInt(process.env.SESSION_TTL_SECONDS || '3600', 10);
+    return isNaN(value) || value <= 0 ? 3600 : value;
+})();
+
+const REDIS_RETRY_INTERVAL_MS = (() => {
+    const value = parseInt(process.env.REDIS_RETRY_INTERVAL_MS || '30000', 10);
+    return isNaN(value) || value <= 0 ? 30000 : value;
+})();
+
+const REDIS_OPERATION_RETRY_MS = (() => {
+    const value = parseInt(process.env.REDIS_OPERATION_RETRY_MS || '1000', 10);
+    return isNaN(value) || value <= 0 ? 1000 : value;
+})();
+
+function delay(ms: number) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function waitForRedisReady(): Promise<void> {
+    // Ensure connection attempts are active
+    await initializeRedis();
+
+    let backoff = 250;
+    const maxBackoff = 5000;
+    while (!(redis as any).isReady) {
+        await delay(backoff);
+        backoff = Math.min(maxBackoff, Math.floor(backoff * 1.5));
+        // Kick the client in case connect wasn't called yet or ended
+        try {
+            if (!(redis as any).isOpen) {
+                await redis.connect().catch(() => { });
+            }
+        } catch { }
+    }
+}
 
 // Initialize Redis connection
 async function initializeRedis(): Promise<boolean> {
-    if (redisConnectionAttempted) {
-        return useRedis;
+    // If already using Redis and client is ready, we're good
+    if (useRedis && (redis as any).isReady) {
+        return true;
     }
 
-    if (!redisConnectionPromise) {
+    // If a previous attempt failed, allow periodic re-attempts
+    const now = Date.now();
+    if (redisConnectionAttempted && !useRedis && now - lastRedisInitAttempt < REDIS_RETRY_INTERVAL_MS) {
+        return false;
+    }
+
+    if (!redisConnectionPromise || (!useRedis && now - lastRedisInitAttempt >= REDIS_RETRY_INTERVAL_MS)) {
         redisConnectionPromise = (async () => {
             try {
                 redisConnectionAttempted = true;
+                lastRedisInitAttempt = Date.now();
                 let connectionSucceeded = false;
 
                 redis.on('error', (err: Error) => {
-                    // Only log and fall back to memory if connection hasn't succeeded yet
                     if (!connectionSucceeded) {
                         console.log('Redis not available, using in-memory session storage for development');
                         useRedis = false;
                     } else {
-                        // If connection had succeeded, just log but don't change useRedis
                         console.warn('Redis error after successful connection:', err.message);
                     }
                 });
@@ -82,12 +126,22 @@ async function initializeRedis(): Promise<boolean> {
                     console.log('Redis Client Ready');
                 });
 
-                await Promise.race([
-                    redis.connect(),
-                    new Promise((_, reject) =>
-                        setTimeout(() => reject(new Error('Redis connection timeout')), 2000)
-                    )
-                ]);
+                redis.on('end', () => {
+                    console.warn('Redis connection ended. Waiting for reconnection...');
+                    useRedis = false;
+                    // Allow subsequent initialize attempts
+                    redisConnectionAttempted = false;
+                    redisConnectionPromise = null;
+                });
+
+                if (!(redis as any).isOpen) {
+                    await Promise.race([
+                        redis.connect(),
+                        new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('Redis connection timeout')), 2000)
+                        )
+                    ]);
+                }
 
                 // Verify connection works before marking as successful
                 await redis.ping();
@@ -104,6 +158,30 @@ async function initializeRedis(): Promise<boolean> {
 
     await redisConnectionPromise;
     return useRedis;
+}
+
+async function withRedisRetry<T>(label: string, op: () => Promise<T>): Promise<T> {
+    // Ensure Redis is connected (retry until ready)
+    await waitForRedisReady();
+    let attempt = 0;
+    // Use capped exponential backoff for op-level retry
+    while (true) {
+        try {
+            return await op();
+        } catch (err: any) {
+            attempt++;
+            console.warn(`[${label}] Redis operation failed (attempt ${attempt}): ${err?.message || err}`);
+            // If client not ready, wait and try to reconnect
+            if (!(redis as any).isReady) {
+                await delay(REDIS_OPERATION_RETRY_MS);
+                await waitForRedisReady();
+                continue;
+            }
+            // Backoff before retry
+            const sleep = Math.min(REDIS_OPERATION_RETRY_MS * attempt, 5000);
+            await delay(sleep);
+        }
+    }
 }
 
 // Schema caching
@@ -1236,88 +1314,38 @@ export function generateSessionId(): string {
 
 // Query state storage functions
 export async function saveQueryState(sessionId: string, queryState: QueryState): Promise<void> {
-    const redisAvailable = await initializeRedis();
     const serializableData = { ...queryState };
-
-    try {
-        if (redisAvailable && useRedis) {
-            const sessionKey = `querystate:${sessionId}`;
-            await redis.setEx(sessionKey, 3600, JSON.stringify(serializableData));
-            console.log(`Session ${sessionId} saved to Redis`);
-        } else {
-            memoryStorage.set(`querystate:${sessionId}`, serializableData);
-            console.log(`Session ${sessionId} saved to memory storage`);
-        }
-    } catch (error) {
-        console.error(`Error saving query state ${sessionId} to Redis:`, error);
-        // Always fall back to memory storage on error
-        memoryStorage.set(`querystate:${sessionId}`, serializableData);
-        console.log(`Session ${sessionId} saved to memory storage as fallback`);
-    }
+    await withRedisRetry('saveQueryState', async () => {
+        const sessionKey = `querystate:${sessionId}`;
+        await redis.setEx(sessionKey, SESSION_TTL_SECONDS, JSON.stringify(serializableData));
+        console.log(`Session ${sessionId} saved to Redis`);
+    });
 }
 
 export async function loadQueryState(sessionId: string): Promise<QueryState | null> {
-    const redisAvailable = await initializeRedis();
-
-    try {
-        if (redisAvailable && useRedis) {
-            const sessionKey = `querystate:${sessionId}`;
-            const data = await redis.get(sessionKey);
-
-            if (data) {
-                const jsonString = typeof data === 'string' ? data : (data as Buffer).toString();
-                const queryState = JSON.parse(jsonString);
-                console.log(`Session ${sessionId} loaded from Redis`);
-                return queryState;
-            }
-
-            // If not found in Redis, also check memory storage as fallback
-            const memoryData = memoryStorage.get(`querystate:${sessionId}`);
-            if (memoryData) {
-                console.log(`Session ${sessionId} found in memory storage fallback`);
-                return memoryData;
-            }
-        } else {
-            const memoryData = memoryStorage.get(`querystate:${sessionId}`);
-            if (memoryData) {
-                console.log(`Session ${sessionId} loaded from memory storage`);
-                return memoryData;
-            }
+    const sessionKey = `querystate:${sessionId}`;
+    return await withRedisRetry('loadQueryState', async () => {
+        const data = await redis.get(sessionKey);
+        if (!data) {
+            console.log(`Session ${sessionId} not found in Redis`);
+            return null;
         }
-
-        console.log(`Session ${sessionId} not found in any storage`);
-        return null;
-    } catch (error) {
-        console.error(`Error loading query state ${sessionId} from Redis:`, error);
-        // Fall back to memory storage on error
-        const memoryData = memoryStorage.get(`querystate:${sessionId}`);
-        if (memoryData) {
-            console.log(`Session ${sessionId} loaded from memory storage after Redis error`);
-            return memoryData;
-        }
-        return null;
-    }
+        const jsonString = typeof data === 'string' ? data : (data as Buffer).toString();
+        const queryState = JSON.parse(jsonString);
+        console.log(`Session ${sessionId} loaded from Redis`);
+        try {
+            await redis.expire(sessionKey, SESSION_TTL_SECONDS);
+        } catch { }
+        return queryState;
+    });
 }
 
 export async function deleteQueryState(sessionId: string): Promise<boolean> {
-    const redisAvailable = await initializeRedis();
-
-    try {
-        if (redisAvailable && useRedis) {
-            const sessionKey = `querystate:${sessionId}`;
-            const result = await redis.del(sessionKey);
-            return (result as number) > 0;
-        } else {
-            const existed = memoryStorage.has(`querystate:${sessionId}`);
-            memoryStorage.delete(`querystate:${sessionId}`);
-            return existed;
-        }
-    } catch (error) {
-        console.error(`Error deleting query state ${sessionId}:`, error);
-        const existed = memoryStorage.has(`querystate:${sessionId}`);
-        memoryStorage.delete(`querystate:${sessionId}`);
-        return existed;
-    }
+    const sessionKey = `querystate:${sessionId}`;
+    return await withRedisRetry('deleteQueryState', async () => {
+        const result = await redis.del(sessionKey);
+        return (result as number) > 0;
+    });
 }
 
 // Export the raw schema cache for use in other tools
