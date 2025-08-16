@@ -36,13 +36,19 @@ import { randomBytes } from 'crypto';
 // Load environment variables from .env file
 config({ path: '.env' });
 
+// Sessions are persisted via Redis only (no FS/memory fallbacks)
+
 // Redis client setup
+const REDIS_CONNECT_TIMEOUT_MS = (() => {
+    const v = parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS || '100000', 10);
+    return isNaN(v) || v <= 0 ? 100000 : v;
+})();
 const redis = createClient({
     url: process.env.REDIS_URL || 'redis://localhost:6379',
     socket: {
         // Implement a bounded exponential backoff reconnect strategy
         reconnectStrategy: (retries: number) => Math.min(1000 * Math.pow(2, retries), 15000),
-        connectTimeout: 2000,
+        connectTimeout: REDIS_CONNECT_TIMEOUT_MS,
     }
 });
 
@@ -74,13 +80,18 @@ function delay(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+const REDIS_READY_MAX_WAIT_MS = (() => {
+    const v = parseInt(process.env.REDIS_READY_MAX_WAIT_MS || '100000', 10);
+    return isNaN(v) || v <= 0 ? 100000 : v;
+})();
+
 async function waitForRedisReady(): Promise<void> {
     // Ensure connection attempts are active
     await initializeRedis();
 
     let backoff = 250;
     const maxBackoff = 5000;
-    const maxWaitTime = 10000; // Maximum 10 seconds to wait for Redis
+    const maxWaitTime = REDIS_READY_MAX_WAIT_MS; // Configurable wait for Redis readiness
     const startTime = Date.now();
     
     while (!(redis as any).isReady) {
@@ -150,7 +161,7 @@ async function initializeRedis(): Promise<boolean> {
                     await Promise.race([
                         redis.connect(),
                         new Promise((_, reject) =>
-                            setTimeout(() => reject(new Error('Redis connection timeout')), 2000)
+                            setTimeout(() => reject(new Error('Redis connection timeout')), REDIS_CONNECT_TIMEOUT_MS)
                         )
                     ]);
                 }
@@ -172,11 +183,16 @@ async function initializeRedis(): Promise<boolean> {
     return useRedis;
 }
 
+const REDIS_OPERATION_MAX_ATTEMPTS = (() => {
+    const v = parseInt(process.env.REDIS_OPERATION_MAX_ATTEMPTS || '10', 10);
+    return isNaN(v) || v <= 0 ? 10 : v;
+})();
+
 async function withRedisRetry<T>(label: string, op: () => Promise<T>): Promise<T> {
     // Ensure Redis is connected (retry until ready)
     await waitForRedisReady();
     let attempt = 0;
-    const maxAttempts = 5; // Limit retry attempts to prevent infinite loops
+    const maxAttempts = REDIS_OPERATION_MAX_ATTEMPTS; // Configurable op-level retry attempts
     
     // Use capped exponential backoff for op-level retry
     while (attempt < maxAttempts) {
@@ -237,6 +253,7 @@ export interface QueryState {
     operationDirectives: any[];
     createdAt: string;
 }
+
 
 // GraphQL validation utilities
 export class GraphQLValidationUtils {
@@ -1346,8 +1363,8 @@ export function generateSessionId(): string {
 // Query state storage functions
 export async function saveQueryState(sessionId: string, queryState: QueryState): Promise<void> {
     const serializableData = { ...queryState };
+    const normalizedId = normalizeSessionId(sessionId);
     await withRedisRetry('saveQueryState', async () => {
-        const normalizedId = normalizeSessionId(sessionId);
         const sessionKey = `querystate:${normalizedId}`;
         if (HAS_SESSION_TTL) {
             await redis.setEx(sessionKey, SESSION_TTL_SECONDS, JSON.stringify(serializableData));
