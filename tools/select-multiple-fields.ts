@@ -5,7 +5,7 @@ import { isObjectType, isInterfaceType, getNamedType, GraphQLObjectType, GraphQL
 // Core business logic - testable function
 export async function selectMultipleFields(
     sessionId: string,
-    parentPath: string = "",
+    currentPath: string = "",
     fieldNames: string[]
 ): Promise<{
     success?: boolean;
@@ -35,14 +35,14 @@ export async function selectMultipleFields(
             };
         }
 
-        // Navigate to the parent node in the query structure
+        // Navigate to the current node in the query structure
         let parentNode = queryState.queryStructure;
-        if (parentPath) {
-            const pathParts = parentPath.split('.');
+        if (currentPath) {
+            const pathParts = currentPath.split('.');
             for (const part of pathParts) {
                 if (!parentNode.fields[part]) {
                     return {
-                        error: `Parent path '${parentPath}' not found in query structure.`
+                        error: `Path '${currentPath}' not found in query structure.`
                     };
                 }
                 parentNode = parentNode.fields[part];
@@ -56,7 +56,7 @@ export async function selectMultipleFields(
                 const validation = GraphQLValidationUtils.validateFieldAddition(
                     schema,
                     queryState,
-                    parentPath,
+                    currentPath,
                     fieldName
                 );
 
@@ -96,9 +96,9 @@ export async function selectMultipleFields(
 
         return {
             success: true,
-            message: `Successfully selected ${addedFields.length} fields at path '${parentPath}': ${addedFields.join(', ')}.`,
+            message: `Successfully selected ${addedFields.length} fields at path '${currentPath}': ${addedFields.join(', ')}.`,
             selectedFields: addedFields,
-            parentPath
+            parentPath: currentPath
         };
     } catch (error) {
         return {
@@ -112,15 +112,15 @@ export const selectMultipleFieldsTool = {
     description: "Add multiple fields to the GraphQL query structure in a single operation for efficiency",
     schema: {
         sessionId: z.string().describe('The session ID from start-query-session.'),
-        parentPath: z.string().default("").describe('Dot-notation path where fields should be added (e.g., "user", "" for root).'),
+        currentPath: z.string().default("").describe('Dot-notation path where fields should be added (e.g., "user", "" for root).'),
         fieldNames: z.array(z.string()).describe('Array of field names to select (without aliases or arguments).'),
     },
-    handler: async ({ sessionId, parentPath = "", fieldNames }: {
+    handler: async ({ sessionId, currentPath = "", fieldNames }: {
         sessionId: string,
-        parentPath?: string,
+        currentPath?: string,
         fieldNames: string[]
     }) => {
-        const result = await selectMultipleFields(sessionId, parentPath, fieldNames);
+        const result = await selectMultipleFields(sessionId, currentPath, fieldNames);
 
         return {
             content: [{

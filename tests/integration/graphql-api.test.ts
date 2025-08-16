@@ -104,7 +104,7 @@ describe('GraphQL API Integration Tests', () => {
 
             await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',
                 value: 1,
 

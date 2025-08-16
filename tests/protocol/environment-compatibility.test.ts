@@ -82,7 +82,7 @@ describe('Environment Investigation - Why Testers See Different Results', () => 
 
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',
                 value: 1,
                 // Real validation
@@ -108,7 +108,7 @@ describe('Environment Investigation - Why Testers See Different Results', () => 
 
             const result = await setFieldDirectiveTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 directiveName: 'include',
                 argumentName: 'if',
                 argumentValue: true,

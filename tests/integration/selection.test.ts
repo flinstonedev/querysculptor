@@ -436,7 +436,7 @@ describe('Field Selection - Error Handling', () => {
     it('should return an error for an invalid parent path', async () => {
         const { selectGraphQLField } = await import('../../tools/select-field');
         const result = await selectGraphQLField('test-session', 'invalid.path', 'id');
-        expect(result.error).toContain("Parent path 'invalid.path' not found in query structure.");
+        expect(result.error).toContain("Path 'invalid.path' not found in query structure.");
     });
 
     it('should return an error for an invalid field name', async () => {

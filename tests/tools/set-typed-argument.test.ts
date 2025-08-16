@@ -65,7 +65,7 @@ describe('set-typed-argument - Issue #2: Argument Type Coercion', () => {
         it('should store numeric arguments as actual numbers, not strings', async () => {
             const result = await setTypedArgumentTool.handler({
                 sessionId: testSessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'limit',
                 value: 100
             });
@@ -95,7 +95,7 @@ describe('set-typed-argument - Issue #2: Argument Type Coercion', () => {
             for (const testCase of testCases) {
                 const result = await setTypedArgumentTool.handler({
                     sessionId: testSessionId,
-                    fieldPath: 'characters',
+                    currentPath: 'characters',
                     argumentName: testCase.arg,
                     value: testCase.value
                 });
@@ -118,7 +118,7 @@ describe('set-typed-argument - Issue #2: Argument Type Coercion', () => {
         it('should store boolean arguments as actual booleans, not strings', async () => {
             const result = await setTypedArgumentTool.handler({
                 sessionId: testSessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'includeImages',
                 value: true
             });
@@ -143,7 +143,7 @@ describe('set-typed-argument - Issue #2: Argument Type Coercion', () => {
             for (const boolValue of testCases) {
                 const result = await setTypedArgumentTool.handler({
                     sessionId: testSessionId,
-                    fieldPath: 'characters',
+                    currentPath: 'characters',
                     argumentName: 'active',
                     value: boolValue
                 });
@@ -165,7 +165,7 @@ describe('set-typed-argument - Issue #2: Argument Type Coercion', () => {
         it('should handle null values correctly', async () => {
             const result = await setTypedArgumentTool.handler({
                 sessionId: testSessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',
                 value: null
             });
@@ -189,7 +189,7 @@ describe('set-typed-argument - Issue #2: Argument Type Coercion', () => {
             // This test ensures that the buildSelectionSet function properly handles typed values
             await setTypedArgumentTool.handler({
                 sessionId: testSessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'limit',
                 value: 100
             });
@@ -210,7 +210,7 @@ describe('set-typed-argument - Issue #2: Argument Type Coercion', () => {
         it('should generate GraphQL syntax without quotes for boolean values', async () => {
             await setTypedArgumentTool.handler({
                 sessionId: testSessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'active',
                 value: true
             });
@@ -230,7 +230,7 @@ describe('set-typed-argument - Issue #2: Argument Type Coercion', () => {
         it('should validate argument names', async () => {
             const result = await setTypedArgumentTool.handler({
                 sessionId: testSessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: '123invalidName',
                 value: 100
             });
@@ -244,7 +244,7 @@ describe('set-typed-argument - Issue #2: Argument Type Coercion', () => {
         it('should handle session not found', async () => {
             const result = await setTypedArgumentTool.handler({
                 sessionId: 'non-existent-session',
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',
                 value: 1
             });

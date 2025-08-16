@@ -37,12 +37,12 @@ vi.mock('../../tools/shared-utils.js', async () => {
             coerceStringValue: vi.fn().mockImplementation((value) => ({ coerced: false, value })),
             generatePerformanceWarning: vi.fn().mockReturnValue(null),
             validateValueAgainstType: vi.fn().mockReturnValue(null),
-            getArgumentType: vi.fn().mockImplementation((schema, fieldPath, argName) => {
+            getArgumentType: vi.fn().mockImplementation((schema, currentPath, argName) => {
                 // Mock the argument type resolution for the test fields
-                if (fieldPath === 'viewer.avatarUrl' && argName === 'size') {
+                if (currentPath === 'viewer.avatarUrl' && argName === 'size') {
                     return { name: 'Int' };
                 }
-                if (fieldPath === 'repositories' && (argName === 'first' || argName === 'last')) {
+                if (currentPath === 'repositories' && (argName === 'first' || argName === 'last')) {
                     return { name: 'Int' };
                 }
                 return null;

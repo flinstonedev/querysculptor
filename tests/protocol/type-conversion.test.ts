@@ -124,7 +124,7 @@ describe('Type Conversion Debug - Understanding the Real Issue', () => {
 
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',
                 value: testValue,
 
@@ -154,7 +154,7 @@ describe('Type Conversion Debug - Understanding the Real Issue', () => {
 
             const result = await setFieldDirectiveTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 directiveName: 'include',
                 argumentName: 'if',
                 argumentValue: testValue,
@@ -215,7 +215,7 @@ describe('Type Conversion Debug - Understanding the Real Issue', () => {
 
                 const result = await setTypedArgumentTool.handler({
                     sessionId,
-                    fieldPath: 'characters',
+                    currentPath: 'characters',
                     argumentName: 'page',
                     value: value,
 

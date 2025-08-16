@@ -195,7 +195,7 @@ describe('Issue #3: Inline Fragment Field Rendering Bug', () => {
             );
 
             expect(result.success).toBe(undefined);
-            expect(result.error).toContain('Parent path');
+            expect(result.error).toContain('Path');
             expect(result.error).toContain('not found');
         });
     });

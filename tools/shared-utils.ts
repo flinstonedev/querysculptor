@@ -879,7 +879,7 @@ export class GraphQLValidationUtils {
     static validateFieldAddition(
         schema: GraphQLSchema,
         queryState: QueryState,
-        parentPath: string,
+        currentPath: string,
         fieldName: string,
         alias?: string
     ): { valid: boolean; error?: string; warning?: string } {
@@ -927,13 +927,13 @@ export class GraphQLValidationUtils {
             }
 
             // Navigate through path if specified
-            if (parentPath) {
-                const pathParts = parentPath.split('.');
+            if (currentPath) {
+                const pathParts = currentPath.split('.');
                 for (const part of pathParts) {
                     if (!currentType || (!isObjectType(currentType) && !isInterfaceType(currentType))) {
                         return {
                             valid: false,
-                            error: `Cannot traverse path '${parentPath}': type '${(currentType as any)?.name || 'unknown'}' is not an object or interface type`
+                            error: `Cannot traverse path '${currentPath}': type '${(currentType as any)?.name || 'unknown'}' is not an object or interface type`
                         };
                     }
 
@@ -981,7 +981,7 @@ export class GraphQLValidationUtils {
             }
 
             // Check for field conflicts in query structure
-            const targetNode = this.navigateToQueryNode(queryState.queryStructure, parentPath);
+            const targetNode = this.navigateToQueryNode(queryState.queryStructure, currentPath);
             if (targetNode && targetNode.fields) {
                 const key = alias || fieldName;
                 if (targetNode.fields[key] && targetNode.fields[key].fieldName !== fieldName) {

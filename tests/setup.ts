@@ -599,18 +599,18 @@ export const createSharedUtilsMock = (customMocks = {}) => ({
       };
     },
     // Enhanced validation methods for Issue #4
-    validateArgumentInSchema: (fieldDef: any, argumentName: string, fieldPath?: string) => {
+    validateArgumentInSchema: (fieldDef: any, argumentName: string, currentPath?: string) => {
       // Mock argument validation - return failure for non-existent args with suggestion
       if (argumentName === 'nonExistentArg' || argumentName === 'invalidArg') {
         return {
           valid: false,
-          error: `Argument '${argumentName}' not found on field '${fieldPath || 'unknown'}'. Available arguments: page, limit, active.`
+          error: `Argument '${argumentName}' not found on field '${currentPath || 'unknown'}'. Available arguments: page, limit, active.`
         };
       }
       if (argumentName === 'activ') {
         return {
           valid: false,
-          error: `Argument '${argumentName}' not found on field '${fieldPath || 'unknown'}'. Did you mean 'active'?`
+          error: `Argument '${argumentName}' not found on field '${currentPath || 'unknown'}'. Did you mean 'active'?`
         };
       }
       return { valid: true, argDef: { type: { name: 'String' } } };
@@ -677,7 +677,7 @@ export const createSharedUtilsMock = (customMocks = {}) => ({
       // This allows tests to focus on testing the integration rather than schema validation
       return { valid: true };
     },
-    validateArgumentAddition: (schema: any, queryState: any, fieldPath: string, argumentName: string, value: any, isVariable: boolean = false) => {
+    validateArgumentAddition: (schema: any, queryState: any, currentPath: string, argumentName: string, value: any, isVariable: boolean = false) => {
       // Mock that simulates proper argument validation
       if (!schema || !queryState) {
         return { valid: false, error: 'Missing schema or query state' };
@@ -689,8 +689,8 @@ export const createSharedUtilsMock = (customMocks = {}) => ({
       }
       
       // Check if field exists in query structure (simplified mock)
-      if (!fieldPath || fieldPath === 'nonexistent') {
-        return { valid: false, error: `Field at path '${fieldPath}' not found in query structure. Add the field first.` };
+      if (!currentPath || currentPath === 'nonexistent') {
+        return { valid: false, error: `Field at path '${currentPath}' not found in query structure. Add the field first.` };
       }
       
       // For mock purposes, assume all valid arguments are acceptable
@@ -732,18 +732,18 @@ export const createSharedUtilsMock = (customMocks = {}) => ({
       
       return currentNode;
     },
-    getArgumentType: (schema: any, fieldPath: string, argumentName: string) => {
+    getArgumentType: (schema: any, currentPath: string, argumentName: string) => {
       // Mock that returns argument types for known test cases
-      if (fieldPath === 'characters' && argumentName === 'page') {
+      if (currentPath === 'characters' && argumentName === 'page') {
         return { name: 'Int', toString: () => 'Int' };
       }
-      if (fieldPath === 'characters' && argumentName === 'includeImages') {
+      if (currentPath === 'characters' && argumentName === 'includeImages') {
         return { name: 'Boolean', toString: () => 'Boolean' };
       }
-      if (fieldPath === 'characters' && argumentName === 'active') {
+      if (currentPath === 'characters' && argumentName === 'active') {
         return { name: 'Boolean', toString: () => 'Boolean' };
       }
-      if (fieldPath === 'character' && argumentName === 'id') {
+      if (currentPath === 'character' && argumentName === 'id') {
         return { name: 'ID', toString: () => 'ID' };
       }
       

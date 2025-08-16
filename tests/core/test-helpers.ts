@@ -94,13 +94,13 @@ export function expectArgumentSet(
     result: any,
     argumentName: string,
     argumentValue: any,
-    fieldPath: string
+    currentPath: string
 ): void {
     expectSuccess(result);
 
     expect(result.message).toContain(`argument '${argumentName}'`);
     expect(result.message).toContain(String(argumentValue));
-    expect(result.message).toContain(`path '${fieldPath}'`);
+    expect(result.message).toContain(`path '${currentPath}'`);
 
     // Verify query structure was updated
     expect(result.queryStructure).toBeDefined();
@@ -220,13 +220,13 @@ export function expectCurrentQuery(
 export function expectDirectiveSet(
     result: any,
     directiveName: string,
-    fieldPath?: string
+    currentPath?: string
 ): void {
     expectSuccess(result);
 
     expect(result.message).toContain(`Directive '@${directiveName}'`);
 
-    if (fieldPath) {
-        expect(result.message).toContain(`path '${fieldPath}'`);
+    if (currentPath) {
+        expect(result.message).toContain(`path '${currentPath}'`);
     }
 } 

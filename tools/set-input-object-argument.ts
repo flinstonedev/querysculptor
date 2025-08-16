@@ -30,7 +30,7 @@ async function setObjectValueByPath(obj: any, path: string, value: any) {
 
 export async function setInputObjectArgument(
     sessionId: string,
-    fieldPath: string,
+    currentPath: string,
     argumentName: string,
     objectPath: string,
     value: any
@@ -49,11 +49,11 @@ export async function setInputObjectArgument(
         }
 
         let fieldNode = queryState.queryStructure;
-        if (fieldPath) {
-            const pathParts = fieldPath.split('.');
+        if (currentPath) {
+            const pathParts = currentPath.split('.');
             for (const part of pathParts) {
                 if (!fieldNode.fields || !fieldNode.fields[part]) {
-                    return { error: `Field at path '${fieldPath}' not found.` };
+                    return { error: `Field at path '${currentPath}' not found.` };
                 }
                 fieldNode = fieldNode.fields[part];
             }
@@ -83,12 +83,12 @@ export async function setInputObjectArgument(
                 : opType === 'subscription'
                     ? (schema.getSubscriptionType() || schema.getQueryType() || schema.getMutationType())
                     : (schema.getQueryType() || schema.getMutationType() || schema.getSubscriptionType());
-            const parts = fieldPath ? fieldPath.split('.') : [];
+            const parts = currentPath ? currentPath.split('.') : [];
             for (const part of parts) {
                 const fields: any = currentType.getFields();
                 const field = fields[part];
                 if (!field) {
-                    return { error: `Field '${part}' not found in schema for path '${fieldPath}'.` };
+                    return { error: `Field '${part}' not found in schema for path '${currentPath}'.` };
                 }
                 currentType = getNamedType(field.type);
             }
@@ -96,9 +96,9 @@ export async function setInputObjectArgument(
             const lastKey = parts.length > 0 ? parts[parts.length - 1] : '';
             const fields: any = currentType.getFields ? currentType.getFields() : {};
             const fieldDef = parts.length > 0 ? fields[lastKey] : null;
-            const argType: GraphQLInputType | null = GraphQLValidationUtils.getArgumentType(schema, fieldPath, argumentName);
+            const argType: GraphQLInputType | null = GraphQLValidationUtils.getArgumentType(schema, currentPath, argumentName);
             if (!argType) {
-                return { error: `Argument '${argumentName}' not found on field '${fieldPath || 'root'}'.` };
+                return { error: `Argument '${argumentName}' not found on field '${currentPath || 'root'}'.` };
             }
 
             // Unwrap NonNull/List to get base input type for structural validation
@@ -152,7 +152,7 @@ export async function setInputObjectArgument(
 
         return {
             success: true,
-            message: `Set '${objectPath}' to '${JSON.stringify(value)}' in input object '${argumentName}' at field '${fieldPath}'.`
+            message: `Set '${objectPath}' to '${JSON.stringify(value)}' in input object '${argumentName}' at field '${currentPath}'.`
         };
 
     } catch (error) {
@@ -165,27 +165,27 @@ export const setInputObjectArgumentTool = {
     description: "Set nested properties within GraphQL input object arguments for complex data structures",
     schema: {
         sessionId: z.string().describe("Session ID"),
-        fieldPath: z.string().describe("Dot-notation path to the field"),
+        currentPath: z.string().describe("Dot-notation path to the field"),
         argumentName: z.string().describe("Argument name for the input object"),
         objectPath: z.string().describe("Dot-notation path inside the input object"),
         value: z.string().describe("Value to set"),
     },
     handler: async ({
         sessionId,
-        fieldPath,
+        currentPath,
         argumentName,
         objectPath,
         value
     }: {
         sessionId: string;
-        fieldPath: string;
+        currentPath: string;
         argumentName: string;
         objectPath: string;
         value: string | number | boolean | null;
     }) => {
         const result = await setInputObjectArgument(
             sessionId,
-            fieldPath,
+            currentPath,
             argumentName,
             objectPath,
             value

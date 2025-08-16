@@ -6,7 +6,7 @@ import { parseType } from 'graphql/language/parser.js';
 // Core business logic - testable function
 export async function setVariableArgument(
     sessionId: string,
-    fieldPath: string,
+    currentPath: string,
     argumentName: string,
     variableName: string
 ): Promise<{
@@ -48,12 +48,12 @@ export async function setVariableArgument(
 
         // Navigate to field in query structure
         let currentNode = queryState.queryStructure;
-        if (fieldPath) {
-            const pathParts = fieldPath.split('.');
+        if (currentPath) {
+            const pathParts = currentPath.split('.');
             for (const part of pathParts) {
                 if (!currentNode.fields || !currentNode.fields[part]) {
                     return {
-                        error: `Field at path '${fieldPath}' not found.`
+                        error: `Field at path '${currentPath}' not found.`
                     };
                 }
                 currentNode = currentNode.fields[part];
@@ -64,9 +64,9 @@ export async function setVariableArgument(
         try {
             const schema = await fetchAndCacheSchema(queryState.headers);
 
-            const argType = GraphQLValidationUtils.getArgumentType(schema, fieldPath, argumentName);
+            const argType = GraphQLValidationUtils.getArgumentType(schema, currentPath, argumentName);
             if (!argType) {
-                return { error: `Argument '${argumentName}' not found on field '${fieldPath}'.` };
+                return { error: `Argument '${argumentName}' not found on field '${currentPath}'.` };
             }
 
             // Ensure variable exists and its type is compatible
@@ -98,7 +98,7 @@ export async function setVariableArgument(
 
         return {
             success: true,
-            message: `Variable argument '${argumentName}' set to ${variableName} at path '${fieldPath}'.`,
+            message: `Variable argument '${argumentName}' set to ${variableName} at path '${currentPath}'.`,
             queryStructure: queryState.queryStructure
         };
     } catch (error) {
@@ -113,17 +113,17 @@ export const setVariableArgumentTool = {
     description: "Set a field argument to reference a GraphQL variable instead of a literal value",
     schema: {
         sessionId: z.string().describe('The session ID from start-query-session.'),
-        fieldPath: z.string().describe('Dot-notation path to the field (e.g., "user.profile").'),
+        currentPath: z.string().describe('Dot-notation path to the field (e.g., "user.profile").'),
         argumentName: z.string().describe('The name of the argument to set.'),
         variableName: z.string().describe('The variable name (must start with $, e.g., "$userId").'),
     },
-    handler: async ({ sessionId, fieldPath, argumentName, variableName }: {
+    handler: async ({ sessionId, currentPath, argumentName, variableName }: {
         sessionId: string,
-        fieldPath: string,
+        currentPath: string,
         argumentName: string,
         variableName: string
     }) => {
-        const result = await setVariableArgument(sessionId, fieldPath, argumentName, variableName);
+        const result = await setVariableArgument(sessionId, currentPath, argumentName, variableName);
 
         return {
             content: [{

@@ -4,7 +4,7 @@ import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils } fr
 // Core business logic - testable function
 export async function applyNamedFragment(
     sessionId: string,
-    parentPath: string = "",
+    currentPath: string = "",
     fragmentName: string
 ): Promise<{
     success?: boolean;
@@ -36,14 +36,14 @@ export async function applyNamedFragment(
             };
         }
 
-        // Navigate to the parent node in the query structure
+        // Navigate to the current node in the query structure
         let parentNode = queryState.queryStructure;
-        if (parentPath) {
-            const pathParts = parentPath.split('.');
+        if (currentPath) {
+            const pathParts = currentPath.split('.');
             for (const part of pathParts) {
                 if (!parentNode.fields || !parentNode.fields[part]) {
                     return {
-                        error: `Parent path '${parentPath}' not found in query structure.`
+                        error: `Path '${currentPath}' not found in query structure.`
                     };
                 }
                 parentNode = parentNode.fields[part];
@@ -64,9 +64,9 @@ export async function applyNamedFragment(
 
         return {
             success: true,
-            message: `Fragment '${fragmentName}' applied at path '${parentPath}'.`,
+            message: `Fragment '${fragmentName}' applied at path '${currentPath}'.`,
             fragmentName,
-            parentPath
+            parentPath: currentPath
         };
     } catch (error) {
         return {
@@ -80,15 +80,15 @@ export const applyNamedFragmentTool = {
     description: "Apply a previously defined named fragment to a specific location in the query",
     schema: z.object({
         sessionId: z.string().describe('The session ID from start-query-session.'),
-        parentPath: z.string().default("").describe('Dot-notation path where the fragment should be applied (e.g., "user", "" for root).'),
+        currentPath: z.string().default("").describe('Dot-notation path where the fragment should be applied (e.g., "user", "" for root).'),
         fragmentName: z.string().describe('The name of the fragment to apply.'),
     }),
-    handler: async ({ sessionId, parentPath = "", fragmentName }: {
+    handler: async ({ sessionId, currentPath = "", fragmentName }: {
         sessionId: string,
-        parentPath?: string,
+        currentPath?: string,
         fragmentName: string
     }) => {
-        const result = await applyNamedFragment(sessionId, parentPath, fragmentName);
+        const result = await applyNamedFragment(sessionId, currentPath, fragmentName);
 
         return {
             content: [{

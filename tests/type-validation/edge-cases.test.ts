@@ -82,7 +82,7 @@ describe('Type Validation Issues - Focused Analysis', () => {
             // Test with valid argument
             const argResultValid = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',
                 value: 1
             });
@@ -94,7 +94,7 @@ describe('Type Validation Issues - Focused Analysis', () => {
             // Test with invalid argument
             const argResultInvalid = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'nonExistentArg',
                 value: 1
             });
@@ -113,7 +113,7 @@ describe('Type Validation Issues - Focused Analysis', () => {
 
             const argResult = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',
                 value: 1
             });
@@ -137,7 +137,7 @@ describe('Type Validation Issues - Focused Analysis', () => {
 
             const directiveResult = await setFieldDirectiveTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 directiveName: 'include',
                 argumentName: 'if',
                 argumentValue: true
@@ -188,7 +188,7 @@ describe('Type Validation Issues - Focused Analysis', () => {
 
             await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',
                 value: 1
             });

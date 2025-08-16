@@ -4,7 +4,7 @@ import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils } fr
 // Core business logic - testable function
 export async function setStringArgument(
     sessionId: string,
-    fieldPath: string,
+    currentPath: string,
     argumentName: string,
     value: string,
     isEnum: boolean = false
@@ -57,7 +57,7 @@ export async function setStringArgument(
             const validation = GraphQLValidationUtils.validateArgumentAddition(
                 schema,
                 queryState,
-                fieldPath,
+                currentPath,
                 argumentName,
                 value,
                 false // String arguments are not variables
@@ -79,12 +79,12 @@ export async function setStringArgument(
 
         // Navigate to field in query structure
         let currentNode = queryState.queryStructure;
-        if (fieldPath) {
-            const pathParts = fieldPath.split('.');
+        if (currentPath) {
+            const pathParts = currentPath.split('.');
             for (const part of pathParts) {
                 if (!currentNode.fields || !currentNode.fields[part]) {
                     return {
-                        error: `Field at path '${fieldPath}' not found.`
+                        error: `Field at path '${currentPath}' not found.`
                     };
                 }
                 currentNode = currentNode.fields[part];
@@ -119,7 +119,7 @@ export async function setStringArgument(
         // Save updated query state
         await saveQueryState(sessionId, queryState);
 
-        let message = `String argument '${argumentName}' set to "${value}" at path '${fieldPath}'.`;
+        let message = `String argument '${argumentName}' set to "${value}" at path '${currentPath}'.`;
         let warning = validationWarning;
 
         // Add type coercion feedback and performance warnings
@@ -155,19 +155,19 @@ export const setStringArgumentTool = {
     description: "Set string or enum arguments on GraphQL fields with automatic type detection and validation",
     schema: {
         sessionId: z.string().describe('The session ID from start-query-session.'),
-        fieldPath: z.string().describe('Dot-notation path to the field (e.g., "user.profile").'),
+        currentPath: z.string().describe('Dot-notation path to the field (e.g., "user.profile").'),
         argumentName: z.string().describe('The name of the argument to set.'),
         value: z.string().describe('The string value for the argument.'),
         isEnum: z.boolean().default(false).describe('If true, treat as enum value (unquoted).'),
     },
-    handler: async ({ sessionId, fieldPath, argumentName, value, isEnum = false }: {
+    handler: async ({ sessionId, currentPath, argumentName, value, isEnum = false }: {
         sessionId: string,
-        fieldPath: string,
+        currentPath: string,
         argumentName: string,
         value: string,
         isEnum?: boolean
     }) => {
-        const result = await setStringArgument(sessionId, fieldPath, argumentName, value, isEnum);
+        const result = await setStringArgument(sessionId, currentPath, argumentName, value, isEnum);
 
         return {
             content: [{

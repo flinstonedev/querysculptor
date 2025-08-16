@@ -74,7 +74,7 @@ describe('Null String Conversion Fix', () => {
         it('should convert string "null" to actual null value', async () => {
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'filter',
                 value: 'null'
             });
@@ -94,7 +94,7 @@ describe('Null String Conversion Fix', () => {
         it('should convert string "NULL" (uppercase) to actual null value', async () => {
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',
                 value: 'NULL'
             });
@@ -114,7 +114,7 @@ describe('Null String Conversion Fix', () => {
         it('should convert string "Null" (mixed case) to actual null value', async () => {
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'rating',
                 value: 'Null'
             });
@@ -134,7 +134,7 @@ describe('Null String Conversion Fix', () => {
         it('should generate query with null (not "null") for string null conversion', async () => {
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'filter',
                 value: 'null'
             });
@@ -150,7 +150,7 @@ describe('Null String Conversion Fix', () => {
         it('should not convert other strings that contain "null" as substring', async () => {
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'name',
                 value: 'nullable_field'
             });

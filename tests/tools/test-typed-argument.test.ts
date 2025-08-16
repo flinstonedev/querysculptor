@@ -62,7 +62,7 @@ describe('Issue #2: Argument Type Coercion Problems', () => {
     it('should store numeric arguments as actual numbers, not strings', async () => {
         const result = await setTypedArgumentTool.handler({
             sessionId: testSessionId,
-            fieldPath: 'characters',
+            currentPath: 'characters',
             argumentName: 'limit',
             value: 100
         });
@@ -86,7 +86,7 @@ describe('Issue #2: Argument Type Coercion Problems', () => {
     it('should store boolean arguments as actual booleans, not strings', async () => {
         const result = await setTypedArgumentTool.handler({
             sessionId: testSessionId,
-            fieldPath: 'characters',
+            currentPath: 'characters',
             argumentName: 'active',
             value: true
         });

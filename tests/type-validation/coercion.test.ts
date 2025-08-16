@@ -163,7 +163,7 @@ describe('Type Coercion Fix - Resolving Tester-Reported Issues', () => {
 
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',
                 value: 1,
 
@@ -185,7 +185,7 @@ describe('Type Coercion Fix - Resolving Tester-Reported Issues', () => {
             // Simulate what happens when MCP protocol converts number to string
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',
                 value: "1", // String instead of number
 
@@ -207,7 +207,7 @@ describe('Type Coercion Fix - Resolving Tester-Reported Issues', () => {
 
             const result = await setFieldDirectiveTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 directiveName: 'include',
                 argumentName: 'if',
                 argumentValue: true,
@@ -229,7 +229,7 @@ describe('Type Coercion Fix - Resolving Tester-Reported Issues', () => {
 
             const result = await setFieldDirectiveTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 directiveName: 'include',
                 argumentName: 'if',
                 argumentValue: "true", // String instead of boolean
@@ -323,7 +323,7 @@ describe('Type Coercion Fix - Resolving Tester-Reported Issues', () => {
             await selectFieldTool.handler({ sessionId, fieldName: 'characters' });
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',
                 value: "not_a_number",
             });
@@ -341,7 +341,7 @@ describe('Type Coercion Fix - Resolving Tester-Reported Issues', () => {
 
             const result = await setFieldDirectiveTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 directiveName: 'include',
                 argumentName: 'if',
                 argumentValue: "not_a_boolean",

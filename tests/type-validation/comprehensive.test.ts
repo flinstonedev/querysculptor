@@ -91,7 +91,7 @@ describe('Comprehensive Type Validation Tests', () => {
             // Test integer
             const intResult = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',
                 value: 1,
 
@@ -109,7 +109,7 @@ describe('Comprehensive Type Validation Tests', () => {
 
             const directiveResult = await setFieldDirectiveTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 directiveName: 'include',
                 argumentName: 'if',
                 argumentValue: true,

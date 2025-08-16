@@ -46,10 +46,10 @@ vi.mock('../../tools/shared-utils', async () => {
         loadQueryState: vi.fn().mockResolvedValue(mockQueryState),
         fetchAndCacheSchema: vi.fn().mockResolvedValue(testSchema),
         GraphQLValidationUtils: {
-            getArgumentType: (schema, fieldPath, argName) => {
+            getArgumentType: (schema, currentPath, argName) => {
                 const queryType = schema.getQueryType();
                 if (queryType) {
-                    const field = queryType.getFields()[fieldPath];
+                    const field = queryType.getFields()[currentPath];
                     if (field) {
                         const arg = field.args.find(a => a.name === argName);
                         if (arg) return arg.type;
@@ -68,7 +68,7 @@ vi.mock('../../tools/shared-utils', async () => {
                 }
                 return { valid: true };
             }),
-            validateArgumentAddition: (schema: any, queryState: any, fieldPath: string, argumentName: string, value: any, isVariable: boolean = false) => {
+            validateArgumentAddition: (schema: any, queryState: any, currentPath: string, argumentName: string, value: any, isVariable: boolean = false) => {
                 // Mock validation that allows most arguments through
                 if (!/^[_A-Za-z][_0-9A-Za-z]*$/.test(argumentName)) {
                     return { valid: false, error: `Invalid argument name "${argumentName}"` };
@@ -130,21 +130,21 @@ vi.mock('../../tools/shared-utils', async () => {
 
 describe('Argument Handling', () => {
     it('should set a string argument on a field', async () => {
-        const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', fieldPath: 'user', argumentName: 'name', value: 'Rick Sanchez' });
+        const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', currentPath: 'user', argumentName: 'name', value: 'Rick Sanchez' });
         const response = JSON.parse(result.content[0].text);
         expect(response.success).toBe(true);
         expect(response.message).toBe("Typed argument 'name' set to \"Rick Sanchez\" at path 'user'.");
     });
 
     it('should set a typed argument on a field', async () => {
-        const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', fieldPath: 'user', argumentName: 'age', value: 30 });
+        const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', currentPath: 'user', argumentName: 'age', value: 30 });
         const response = JSON.parse(result.content[0].text);
         expect(response.success).toBe(true);
         expect(response.message).toBe("Typed argument 'age' set to 30 at path 'user'.");
     });
 
     it('should set a variable argument on a field', async () => {
-        const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', fieldPath: 'user', argumentName: 'name', value: '$userName' });
+        const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', currentPath: 'user', argumentName: 'name', value: '$userName' });
         const response = JSON.parse(result.content[0].text);
         expect(response.success).toBe(true);
         expect(response.message).toBe("Typed argument 'name' set to \"$userName\" at path 'user'.");
@@ -152,42 +152,42 @@ describe('Argument Handling', () => {
 
     describe('Critical Argument Validation', () => {
         it('should handle string arguments correctly', async () => {
-            const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', fieldPath: 'user', argumentName: 'name', value: 'Rick' });
+            const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', currentPath: 'user', argumentName: 'name', value: 'Rick' });
             const response = JSON.parse(result.content[0].text);
             expectSuccess(response, "Typed argument 'name' set to \"Rick\" at path 'user'.");
         });
 
         it('should handle variable references correctly', async () => {
-            const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', fieldPath: 'user', argumentName: 'id', value: '$characterId' });
+            const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', currentPath: 'user', argumentName: 'id', value: '$characterId' });
             const response = JSON.parse(result.content[0].text);
             expectSuccess(response, "Typed argument 'id' set to \"$characterId\" at path 'user'.");
         });
 
         it('should handle enum arguments correctly', async () => {
-            const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', fieldPath: 'user', argumentName: 'status', value: 'ALIVE' });
+            const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', currentPath: 'user', argumentName: 'status', value: 'ALIVE' });
             const response = JSON.parse(result.content[0].text);
             expectSuccess(response, "Typed argument 'status' set to \"ALIVE\" at path 'user'.");
         });
 
         it('should support all GraphQL scalar types correctly', async () => {
             // String
-            const stringResult = await setTypedArgumentTool.handler({ sessionId: 'test-session', fieldPath: 'user', argumentName: 'name', value: 'Rick' });
+            const stringResult = await setTypedArgumentTool.handler({ sessionId: 'test-session', currentPath: 'user', argumentName: 'name', value: 'Rick' });
             expect(JSON.parse(stringResult.content[0].text).success).toBe(true);
 
             // Int
-            const intResult = await setTypedArgumentTool.handler({ sessionId: 'test-session', fieldPath: 'user', argumentName: 'page', value: 42 });
+            const intResult = await setTypedArgumentTool.handler({ sessionId: 'test-session', currentPath: 'user', argumentName: 'page', value: 42 });
             expect(JSON.parse(intResult.content[0].text).success).toBe(true);
 
             // Float  
-            const floatResult = await setTypedArgumentTool.handler({ sessionId: 'test-session', fieldPath: 'user', argumentName: 'rating', value: 3.14 });
+            const floatResult = await setTypedArgumentTool.handler({ sessionId: 'test-session', currentPath: 'user', argumentName: 'rating', value: 3.14 });
             expect(JSON.parse(floatResult.content[0].text).success).toBe(true);
 
             // Boolean
-            const booleanResult = await setTypedArgumentTool.handler({ sessionId: 'test-session', fieldPath: 'user', argumentName: 'active', value: true });
+            const booleanResult = await setTypedArgumentTool.handler({ sessionId: 'test-session', currentPath: 'user', argumentName: 'active', value: true });
             expect(JSON.parse(booleanResult.content[0].text).success).toBe(true);
 
             // Null
-            const nullResult = await setTypedArgumentTool.handler({ sessionId: 'test-session', fieldPath: 'user', argumentName: 'optional', value: null });
+            const nullResult = await setTypedArgumentTool.handler({ sessionId: 'test-session', currentPath: 'user', argumentName: 'optional', value: null });
             expect(JSON.parse(nullResult.content[0].text).success).toBe(true);
         });
     });
@@ -195,13 +195,13 @@ describe('Argument Handling', () => {
 
 describe('Argument Handling - Error Handling', () => {
     it('should return an error for a non-existent field path', async () => {
-        const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', fieldPath: 'non.existent', argumentName: 'id', value: '123' });
+        const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', currentPath: 'non.existent', argumentName: 'id', value: '123' });
         const response = JSON.parse(result.content[0].text);
         expect(response.error).toContain("Field at path 'non.existent' not found.");
     });
 
     it('should return an error for an invalid argument name', async () => {
-        const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', fieldPath: 'user', argumentName: 'invalid-name!', value: 42 });
+        const result = await setTypedArgumentTool.handler({ sessionId: 'test-session', currentPath: 'user', argumentName: 'invalid-name!', value: 42 });
         const response = JSON.parse(result.content[0].text);
         expect(response.error).toContain('Invalid argument name: invalid-name!');
     });

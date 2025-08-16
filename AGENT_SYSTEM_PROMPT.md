@@ -107,11 +107,11 @@ When a path’s type is a union/interface (e.g., GitHub search `search.edges.nod
 2) Check possible types with get-selections at `currentPath: "search.edges.node"`
 3) Apply inline fragment using apply-inline-frag
 
-Valid call (supports onType or typeName):
+Valid call (supports both currentPath/parentPath and onType/typeName):
 ```json
 {
   "sessionId": "<SESSION_ID>",
-  "parentPath": "search.edges.node",
+  "currentPath": "search.edges.node",
   "typeName": "Repository",
   "fieldNames": [
     "name",

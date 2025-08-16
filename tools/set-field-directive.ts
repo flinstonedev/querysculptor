@@ -13,7 +13,7 @@ import { parseType } from "graphql/language/parser.js";
 // Core business logic - testable function
 export async function setFieldDirective(
     sessionId: string,
-    fieldPath: string,
+    currentPath: string,
     directiveName: string,
     argumentName?: string,
     argumentValue?: string | number | boolean | null
@@ -21,7 +21,7 @@ export async function setFieldDirective(
     success?: boolean;
     message?: string;
     warning?: string;
-    fieldPath?: string;
+    currentPath?: string;
     directiveName?: string;
     argumentName?: string;
     argumentValue?: string | number | boolean | null;
@@ -93,12 +93,12 @@ export async function setFieldDirective(
 
         // Navigate to field in query structure
         let currentNode = queryState.queryStructure;
-        if (fieldPath) {
-            const pathParts = fieldPath.split('.');
+        if (currentPath) {
+            const pathParts = currentPath.split('.');
             for (const part of pathParts) {
                 if (!currentNode.fields || !currentNode.fields[part]) {
                     return {
-                        error: `Field at path '${fieldPath}' not found.`
+                        error: `Field at path '${currentPath}' not found.`
                     };
                 }
                 currentNode = currentNode.fields[part];
@@ -139,7 +139,7 @@ export async function setFieldDirective(
         // Save updated query state
         await saveQueryState(sessionId, queryState);
 
-        let message = `Directive '@${directiveName}' applied to field at path '${fieldPath}'.`;
+        let message = `Directive '@${directiveName}' applied to field at path '${currentPath}'.`;
         let warning = undefined;
 
         // Add type coercion feedback
@@ -155,7 +155,7 @@ export async function setFieldDirective(
             success: true,
             message,
             warning,
-            fieldPath,
+            currentPath,
             directiveName,
             argumentName,
             argumentValue
@@ -172,19 +172,19 @@ export const setFieldDirectiveTool = {
     description: "Add GraphQL directives like @include or @skip to fields for conditional selection",
     schema: {
         sessionId: z.string().describe('The session ID from start-query-session.'),
-        fieldPath: z.string().describe('Dot-notation path to the field (e.g., "user.profile").'),
+        currentPath: z.string().describe('Dot-notation path to the field (e.g., "user.profile").'),
         directiveName: z.string().describe('The name of the directive (e.g., "include", "skip").'),
         argumentName: z.string().optional().describe('Optional argument name for the directive.'),
         argumentValue: z.string().optional().describe('Optional argument value.'),
     },
-    handler: async ({ sessionId, fieldPath, directiveName, argumentName, argumentValue }: {
+    handler: async ({ sessionId, currentPath, directiveName, argumentName, argumentValue }: {
         sessionId: string,
-        fieldPath: string,
+        currentPath: string,
         directiveName: string,
         argumentName?: string,
         argumentValue?: string | number | boolean | null
     }) => {
-        const result = await setFieldDirective(sessionId, fieldPath, directiveName, argumentName, argumentValue);
+        const result = await setFieldDirective(sessionId, currentPath, directiveName, argumentName, argumentValue);
 
         return {
             content: [{

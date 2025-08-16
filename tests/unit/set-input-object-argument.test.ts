@@ -29,11 +29,11 @@ vi.mock('../../tools/shared-utils', async () => {
         validateInputComplexity: vi.fn().mockReturnValue(null),
         GraphQLValidationUtils: {
             ...base.GraphQLValidationUtils,
-            getArgumentType: (schema: any, fieldPath: string, argumentName: string) => {
+            getArgumentType: (schema: any, currentPath: string, argumentName: string) => {
                 const tryRoot = (root: any) => {
                     if (!root) return null;
                     let current: any = root;
-                    const parts = fieldPath.split('.').filter(Boolean);
+                    const parts = currentPath.split('.').filter(Boolean);
                     for (let i = 0; i < parts.length; i++) {
                         const f = current.getFields()[parts[i]];
                         if (!f) return null;

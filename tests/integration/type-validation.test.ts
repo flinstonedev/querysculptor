@@ -127,7 +127,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
                 // CRITICAL BUG: This should work but currently fails with schema validation
                 const argResult = await setTypedArgumentTool.handler({
                     sessionId,
-                    fieldPath: 'characters',
+                    currentPath: 'characters',
                     argumentName: 'page',
                     value: 1,  // JavaScript number
                     // Real validation should work
@@ -156,7 +156,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
 
                 const argResult = await setTypedArgumentTool.handler({
                     sessionId,
-                    fieldPath: 'characters',
+                    currentPath: 'characters',
                     argumentName: 'page',
                     value: 42,
 
@@ -174,7 +174,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
 
                 const argResult = await setTypedArgumentTool.handler({
                     sessionId,
-                    fieldPath: 'characters',
+                    currentPath: 'characters',
                     argumentName: 'page',
                     value: 0,
 
@@ -192,7 +192,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
 
                 const argResult = await setTypedArgumentTool.handler({
                     sessionId,
-                    fieldPath: 'characters',
+                    currentPath: 'characters',
                     argumentName: 'page',
                     value: -5,
 
@@ -210,7 +210,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
 
                 const argResult = await setTypedArgumentTool.handler({
                     sessionId,
-                    fieldPath: 'characters',
+                    currentPath: 'characters',
                     argumentName: 'page',
                     value: 1.5,  // Float should be rejected for Int
 
@@ -232,7 +232,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
 
                 const argResult = await setTypedArgumentTool.handler({
                     sessionId,
-                    fieldPath: 'characters',
+                    currentPath: 'characters',
                     argumentName: 'includeImages',
                     value: true,  // JavaScript boolean
                 });
@@ -259,7 +259,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
 
                 const argResult = await setTypedArgumentTool.handler({
                     sessionId,
-                    fieldPath: 'characters',
+                    currentPath: 'characters',
                     argumentName: 'active',
                     value: false,
                 });
@@ -279,7 +279,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
                 // CRITICAL BUG: This should work for standard GraphQL @include directive
                 const directiveResult = await setFieldDirectiveTool.handler({
                     sessionId,
-                    fieldPath: 'characters',
+                    currentPath: 'characters',
                     directiveName: 'include',
                     argumentName: 'if',
                     argumentValue: true,  // JavaScript boolean
@@ -308,7 +308,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
 
                 const directiveResult = await setFieldDirectiveTool.handler({
                     sessionId,
-                    fieldPath: 'characters',
+                    currentPath: 'characters',
                     directiveName: 'skip',
                     argumentName: 'if',
                     argumentValue: false,
@@ -416,7 +416,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
                 // ID with string should work (this currently works)
                 const idResult = await setTypedArgumentTool.handler({
                     sessionId,
-                    fieldPath: 'character',
+                    currentPath: 'character',
                     argumentName: 'id',
                     value: "1",  // String for ID - should work
 
@@ -428,7 +428,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
                 // Int with number should also work (this currently fails but shouldn't)
                 const intResult = await setTypedArgumentTool.handler({
                     sessionId,
-                    fieldPath: 'character',
+                    currentPath: 'character',
                     argumentName: 'id',
                     value: 1,  // Number for Int - should work but currently fails
 
@@ -459,7 +459,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
 
                 await setVariableArgumentTool.handler({
                     sessionId,
-                    fieldPath: 'characters',
+                    currentPath: 'characters',
                     argumentName: 'page',
                     variableName: '$page',  // Variable reference
 
@@ -516,7 +516,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
 
                 await setTypedArgumentTool.handler({
                     sessionId,
-                    fieldPath: 'character',
+                    currentPath: 'character',
                     argumentName: 'id',
                     value: 1,
 
@@ -525,7 +525,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
                 // Add name field (always included)
                 await selectFieldTool.handler({
                     sessionId,
-                    parentPath: 'character',
+                    currentPath: 'character',
                     fieldName: 'name',
 
                 });
@@ -533,14 +533,14 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
                 // Add image field with conditional directive
                 await selectFieldTool.handler({
                     sessionId,
-                    parentPath: 'character',
+                    currentPath: 'character',
                     fieldName: 'image',
 
                 });
 
                 await setFieldDirectiveTool.handler({
                     sessionId,
-                    fieldPath: 'character.image',
+                    currentPath: 'character.image',
                     directiveName: 'include',
                     argumentName: 'if',
                     argumentValue: '$includeImage',
@@ -568,7 +568,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
 
                 const argResult = await setTypedArgumentTool.handler({
                     sessionId,
-                    fieldPath: 'characters',
+                    currentPath: 'characters',
                     argumentName: 'page',
                     value: "not_a_number",  // Invalid for Int
 
@@ -584,7 +584,7 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
                 await selectFieldTool.handler({ sessionId, fieldName: 'characters' });
                 const argResult = await setTypedArgumentTool.handler({
                     sessionId,
-                    fieldPath: 'characters',
+                    currentPath: 'characters',
                     argumentName: 'active',
                     value: "not_a_boolean",
                 });

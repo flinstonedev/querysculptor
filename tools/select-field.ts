@@ -11,7 +11,7 @@ import {
 // Core business logic - testable function
 export async function selectGraphQLField(
     sessionId: string,
-    parentPath: string = "",
+    currentPath: string = "",
     fieldName: string,
     alias?: string
 ): Promise<{
@@ -53,7 +53,7 @@ export async function selectGraphQLField(
             const validation = GraphQLValidationUtils.validateFieldAddition(
                 schema,
                 queryState,
-                parentPath,
+                currentPath,
                 fieldName,
                 alias
             );
@@ -72,14 +72,14 @@ export async function selectGraphQLField(
             };
         }
 
-        // Navigate to the parent node in the query structure
+        // Navigate to the current node in the query structure
         let parentNode = queryState.queryStructure;
-        if (parentPath) {
-            const pathParts = parentPath.split('.');
+        if (currentPath) {
+            const pathParts = currentPath.split('.');
             for (const part of pathParts) {
                 if (!parentNode.fields[part]) {
                     return {
-                        error: `Parent path '${parentPath}' not found in query structure.`
+                        error: `Path '${currentPath}' not found in query structure.`
                     };
                 }
                 parentNode = parentNode.fields[part]!;
@@ -114,9 +114,9 @@ export async function selectGraphQLField(
         await saveQueryState(sessionId, queryState);
 
         return {
-            message: `Field '${fieldName}' selected successfully at path '${parentPath}'`,
+            message: `Field '${fieldName}' selected successfully at path '${currentPath}'`,
             fieldKey: key,
-            parentPath: parentPath
+            parentPath: currentPath
         };
     } catch (error) {
         return {
@@ -130,17 +130,17 @@ export const selectFieldTool = {
     description: "Add a field to the GraphQL query structure with optional aliasing and validation",
     schema: {
         sessionId: z.string().describe('The session ID from start-query-session.'),
-        parentPath: z.string().default("").describe('Dot-notation path where the field should be added (e.g., "user", "" for root).'),
+        currentPath: z.string().default("").describe('Dot-notation path where the field should be added (e.g., "user", "" for root).'),
         fieldName: z.string().describe('The name of the field to select.'),
         alias: z.string().optional().describe('An optional alias for the selected field.'),
     },
-    handler: async ({ sessionId, parentPath = "", fieldName, alias }: {
+    handler: async ({ sessionId, currentPath = "", fieldName, alias }: {
         sessionId: string,
-        parentPath?: string,
+        currentPath?: string,
         fieldName: string,
         alias?: string
     }) => {
-        const result = await selectGraphQLField(sessionId, parentPath, fieldName, alias);
+        const result = await selectGraphQLField(sessionId, currentPath, fieldName, alias);
 
         return {
             content: [{

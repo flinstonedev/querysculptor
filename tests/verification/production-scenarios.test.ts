@@ -84,7 +84,7 @@ describe('Type Validation Scenario Testing', () => {
             // Test integer argument validation
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',  // This should exist in Rick and Morty API
                 value: 1,
                 // Use real validation
@@ -108,7 +108,7 @@ describe('Type Validation Scenario Testing', () => {
             // Test boolean directive validation
             const result = await setFieldDirectiveTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 directiveName: 'include',
                 argumentName: 'if',
                 argumentValue: true,  // JavaScript boolean
@@ -151,7 +151,7 @@ describe('Type Validation Scenario Testing', () => {
             // Set up the directive with boolean value
             const directiveResult = await setFieldDirectiveTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 directiveName: 'include',
                 argumentName: 'if',
                 argumentValue: true,
@@ -195,7 +195,7 @@ describe('Type Validation Scenario Testing', () => {
 
             await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',
                 value: 1,
 

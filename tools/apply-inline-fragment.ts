@@ -4,7 +4,7 @@ import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils } fr
 // Core business logic - testable function
 export async function applyInlineFragment(
     sessionId: string,
-    parentPath: string = "",
+    currentPath: string = "",
     onType: string,
     fieldNames: string[]
 ): Promise<{
@@ -27,14 +27,14 @@ export async function applyInlineFragment(
             };
         }
 
-        // Navigate to the parent node in the query structure
+        // Navigate to the current node in the query structure
         let parentNode = queryState.queryStructure;
-        if (parentPath) {
-            const pathParts = parentPath.split('.');
+        if (currentPath) {
+            const pathParts = currentPath.split('.');
             for (const part of pathParts) {
                 if (!parentNode.fields || !parentNode.fields[part]) {
                     return {
-                        error: `Parent path '${parentPath}' not found in query structure.`
+                        error: `Path '${currentPath}' not found in query structure.`
                     };
                 }
                 parentNode = parentNode.fields[part];
@@ -70,9 +70,9 @@ export async function applyInlineFragment(
 
         return {
             success: true,
-            message: `Inline fragment on type '${onType}' applied at path '${parentPath}' with ${fieldNames.length} fields.`,
+            message: `Inline fragment on type '${onType}' applied at path '${currentPath}' with ${fieldNames.length} fields.`,
             onType,
-            parentPath,
+            parentPath: currentPath,
             fieldNames
         };
     } catch (error) {
@@ -87,20 +87,20 @@ export const applyInlineFragmentTool = {
     description: "Apply type-conditional field selections using inline fragments for union/interface types",
     schema: z.object({
         sessionId: z.string().describe('The session ID from start-query-session.'),
-        parentPath: z.string().default("").describe('Dot-notation path where the inline fragment should be applied (e.g., "user", "" for root).'),
-        onType: z.string().optional().describe('The type condition for the inline fragment (e.g., "Repository").'),
-        typeName: z.string().optional().describe('Alias of onType for compatibility with some agents.'),
+        currentPath: z.string().default("").describe('Dot-notation path where the inline fragment should be applied (e.g., "user", "" for root).'),
+        typeName: z.string().optional().describe('The type condition for the inline fragment (e.g., "Repository").'),
+        onType: z.string().optional().describe('Alias of typeName for compatibility.'),
         fieldNames: z.array(z.string()).describe('Array of field names to select in the inline fragment.'),
-    }).refine((data) => !!(data.onType || data.typeName), { message: 'onType (or typeName) is required' }),
-    handler: async ({ sessionId, parentPath = "", onType, typeName, fieldNames }: {
+    }).refine((data) => !!(data.typeName || data.onType), { message: 'typeName (or onType) is required' }),
+    handler: async ({ sessionId, currentPath = "", onType, typeName, fieldNames }: {
         sessionId: string,
-        parentPath?: string,
+        currentPath?: string,
         onType?: string,
         typeName?: string,
         fieldNames: string[]
     }) => {
-        const resolvedOnType = (onType || typeName || '').trim();
-        const result = await applyInlineFragment(sessionId, parentPath, resolvedOnType, sanitizeInlineFields(fieldNames));
+        const resolvedOnType = (typeName || onType || '').trim();
+        const result = await applyInlineFragment(sessionId, currentPath, resolvedOnType, sanitizeInlineFields(fieldNames));
 
         return {
             content: [{

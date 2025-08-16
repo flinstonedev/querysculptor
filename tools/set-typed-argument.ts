@@ -11,7 +11,7 @@ import { coerceInputValue, valueFromAST, parseValue } from 'graphql';
 
 const setTypedArgumentDefinition = z.object({
     sessionId: z.string().describe("The session ID for the user's current query building session."),
-    fieldPath: z.string().describe("The dot-separated path to the field where the argument will be set (e.g., 'characters' or 'user.posts')."),
+    currentPath: z.string().describe("The dot-separated path to the field where the argument will be set (e.g., 'characters' or 'user.posts')."),
     argumentName: z.string().describe("The name of the argument to set."),
     value: z.union([z.string(), z.number(), z.boolean(), z.null()]).describe("The value for the argument. Can be a number, boolean, null, or string representation of these."),
 });
@@ -22,7 +22,7 @@ type SetTypedArgumentParams = z.infer<typeof setTypedArgumentDefinition>;
  * Sets a typed argument (number, boolean, null) on a field in the GraphQL query.
  * This tool performs schema-aware validation to ensure the value is valid for the argument's type.
  */
-async function handler({ sessionId, fieldPath, argumentName, value }: SetTypedArgumentParams): Promise<any> {
+async function handler({ sessionId, currentPath, argumentName, value }: SetTypedArgumentParams): Promise<any> {
     // --- Input Validation ---
     const complexityError = validateInputComplexity(value, `argument "${argumentName}"`);
     if (complexityError) {
@@ -89,30 +89,30 @@ async function handler({ sessionId, fieldPath, argumentName, value }: SetTypedAr
     // --- End Pagination Size Validation ---
 
     // Find the field in the query structure FIRST
-    const pathParts = fieldPath.split('.').filter(p => p);
+    const pathParts = currentPath.split('.').filter(p => p);
     if (pathParts.length === 0) {
-        return { content: [{ type: 'text', text: JSON.stringify({ success: undefined, error: "fieldPath cannot be empty." }) }] };
+        return { content: [{ type: 'text', text: JSON.stringify({ success: undefined, error: "currentPath cannot be empty." }) }] };
     }
 
-    let currentPath: any = state.queryStructure;
+    let currentNode: any = state.queryStructure;
     for (const part of pathParts) {
-        if (!currentPath.fields || !currentPath.fields[part]) {
-            return { content: [{ type: 'text', text: JSON.stringify({ success: undefined, error: `Field at path '${fieldPath}' not found.` }) }] };
+        if (!currentNode.fields || !currentNode.fields[part]) {
+            return { content: [{ type: 'text', text: JSON.stringify({ success: undefined, error: `Field at path '${currentPath}' not found.` }) }] };
         }
-        currentPath = currentPath.fields[part];
+        currentNode = currentNode.fields[part];
     }
 
-    const targetField = currentPath;
+    const targetField = currentNode;
 
     if (!targetField) {
-        return { content: [{ type: 'text', text: JSON.stringify({ success: undefined, error: `Field at path '${fieldPath}' not found.` }) }] };
+        return { content: [{ type: 'text', text: JSON.stringify({ success: undefined, error: `Field at path '${currentPath}' not found.` }) }] };
     }
 
     // Comprehensive incremental validation
     const validation = GraphQLValidationUtils.validateArgumentAddition(
         schema,
         state,
-        fieldPath,
+        currentPath,
         argumentName,
         value,
         typeof value === 'string' && value.startsWith('$')
@@ -131,14 +131,14 @@ async function handler({ sessionId, fieldPath, argumentName, value }: SetTypedAr
     }
 
     // Get argument type for coercion
-    const argType = GraphQLValidationUtils.getArgumentType(schema, fieldPath, argumentName);
+    const argType = GraphQLValidationUtils.getArgumentType(schema, currentPath, argumentName);
     if (!argType) {
         return {
             content: [{
                 type: 'text',
                 text: JSON.stringify({
                     success: undefined,
-                    error: `Argument '${argumentName}' not found on field '${fieldPath}'.`,
+                    error: `Argument '${argumentName}' not found on field '${currentPath}'.`,
                 })
             }]
         };
@@ -275,7 +275,7 @@ async function handler({ sessionId, fieldPath, argumentName, value }: SetTypedAr
     // Build response with warnings if applicable
     const response: any = {
         success: true,
-        message: `Typed argument '${argumentName}' set to ${JSON.stringify(coercedValue)} at path '${fieldPath}'.`,
+        message: `Typed argument '${argumentName}' set to ${JSON.stringify(coercedValue)} at path '${currentPath}'.`,
         query,
         queryStructure: state.queryStructure,
     };
@@ -297,7 +297,7 @@ export const setTypedArgumentTool = {
     description: 'Sets a typed argument (number, boolean, null) on a field in the GraphQL query structure.',
     schema: {
         sessionId: z.string().describe("The session ID for the user's current query building session."),
-        fieldPath: z.string().describe("The dot-separated path to the field where the argument will be set (e.g., 'characters' or 'user.posts')."),
+        currentPath: z.string().describe("The dot-separated path to the field where the argument will be set (e.g., 'characters' or 'user.posts')."),
         argumentName: z.string().describe("The name of the argument to set."),
         value: z.union([z.string(), z.number(), z.boolean(), z.null()]).describe("The value for the argument. Can be a number, boolean, null, or string representation of these."),
     },

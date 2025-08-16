@@ -59,7 +59,7 @@ describe('setTypedArgumentTool', () => {
     it('should reject pagination argument "first" if it exceeds the limit', async () => {
         const result = await setTypedArgumentTool.handler({
             sessionId: 'test-session',
-            fieldPath: 'items',
+            currentPath: 'items',
             argumentName: 'first',
             value: 999
         });
@@ -71,7 +71,7 @@ describe('setTypedArgumentTool', () => {
     it('should reject a negative pagination argument', async () => {
         const result = await setTypedArgumentTool.handler({
             sessionId: 'test-session',
-            fieldPath: 'items',
+            currentPath: 'items',
             argumentName: 'last',
             value: -1
         });
@@ -82,7 +82,7 @@ describe('setTypedArgumentTool', () => {
     it('should accept a valid pagination argument', async () => {
         const result = await setTypedArgumentTool.handler({
             sessionId: 'test-session',
-            fieldPath: 'items',
+            currentPath: 'items',
             argumentName: 'first',
             value: 50
         });
@@ -93,7 +93,7 @@ describe('setTypedArgumentTool', () => {
     it('should accept a non-pagination argument without limit checks', async () => {
         const result = await setTypedArgumentTool.handler({
             sessionId: 'test-session',
-            fieldPath: 'items',
+            currentPath: 'items',
             argumentName: 'other',
             value: 999
         });

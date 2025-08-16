@@ -482,11 +482,11 @@ export const createSharedUtilsMock = (customMocks = {}) => ({
       }
       return { valid: true };
     }),
-    getArgumentType: vi.fn((schema, fieldPath, argumentName) => {
+    getArgumentType: vi.fn((schema, currentPath, argumentName) => {
       // Return a dummy type for mock purposes
       const queryType = schema.getQueryType();
       if (queryType) {
-        const field = queryType.getFields()[fieldPath];
+        const field = queryType.getFields()[currentPath];
         if (field) {
           const arg = field.args.find(a => a.name === argumentName);
           if (arg) return arg.type;

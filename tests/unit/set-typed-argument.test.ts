@@ -78,7 +78,7 @@ describe('setTypedArgument', () => {
     });
 
     it('should set an Int argument', async () => {
-        const result = await setTypedArgumentTool.handler({ sessionId, fieldPath: 'characters', argumentName: 'page', value: 1 });
+        const result = await setTypedArgumentTool.handler({ sessionId, currentPath: 'characters', argumentName: 'page', value: 1 });
         const response = JSON.parse(result.content[0].text);
         expect(response.success).toBe(true);
         expect(mockedSaveQueryState).toHaveBeenCalled();
@@ -87,7 +87,7 @@ describe('setTypedArgument', () => {
     });
 
     it('should set a String argument', async () => {
-        const result = await setTypedArgumentTool.handler({ sessionId, fieldPath: 'characters', argumentName: 'name', value: 'Rick' });
+        const result = await setTypedArgumentTool.handler({ sessionId, currentPath: 'characters', argumentName: 'name', value: 'Rick' });
         const response = JSON.parse(result.content[0].text);
         expect(response.success).toBe(true);
         const savedState = mockedSaveQueryState.mock.calls[0][1];
@@ -99,7 +99,7 @@ describe('setTypedArgument', () => {
         it('should reject argument names with special characters', async () => {
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'invalid-name!',
                 value: 'test'
             });
@@ -113,7 +113,7 @@ describe('setTypedArgument', () => {
         it('should reject argument names starting with numbers', async () => {
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: '123invalid',
                 value: 'test'
             });
@@ -126,7 +126,7 @@ describe('setTypedArgument', () => {
         it('should reject empty argument names', async () => {
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: '',
                 value: 'test'
             });
@@ -140,7 +140,7 @@ describe('setTypedArgument', () => {
         it('should reject non-existent field paths', async () => {
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'nonexistent.field',
+                currentPath: 'nonexistent.field',
                 argumentName: 'arg',
                 value: 'value'
             });
@@ -151,7 +151,7 @@ describe('setTypedArgument', () => {
         it('should reject non-existent arguments on valid fields', async () => {
             const result = await setTypedArgumentTool.handler({
                 sessionId,
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'nonExistentArg',
                 value: 'value'
             });
@@ -163,7 +163,7 @@ describe('setTypedArgument', () => {
             mockedLoadQueryState.mockResolvedValue(null);
             const result = await setTypedArgumentTool.handler({
                 sessionId: 'invalid-session',
-                fieldPath: 'characters',
+                currentPath: 'characters',
                 argumentName: 'page',
                 value: 1
             });
@@ -172,13 +172,13 @@ describe('setTypedArgument', () => {
         });
 
         it('should return error for invalid value type', async () => {
-            const result = await setTypedArgumentTool.handler({ sessionId, fieldPath: 'characters', argumentName: 'page', value: 'not-an-int' });
+            const result = await setTypedArgumentTool.handler({ sessionId, currentPath: 'characters', argumentName: 'page', value: 'not-an-int' });
             const response = JSON.parse(result.content[0].text);
             expect(response.error).toContain("Invalid value for argument 'page'. Reason: Invalid value \"not-an-int\": Int cannot represent non-integer value: \"not-an-int\"");
         });
 
         it('should return error for null on non-nullable argument', async () => {
-            const result = await setTypedArgumentTool.handler({ sessionId, fieldPath: 'character', argumentName: 'id', value: null });
+            const result = await setTypedArgumentTool.handler({ sessionId, currentPath: 'character', argumentName: 'id', value: null });
             const response = JSON.parse(result.content[0].text);
 
             // The function correctly rejects null values for non-nullable arguments
@@ -190,7 +190,7 @@ describe('setTypedArgument', () => {
 
     describe('Pagination Argument Capping', () => {
         it('should cap "first" argument at 100', async () => {
-            const result = await setTypedArgumentTool.handler({ sessionId, fieldPath: 'characters', argumentName: 'first', value: 200 });
+            const result = await setTypedArgumentTool.handler({ sessionId, currentPath: 'characters', argumentName: 'first', value: 200 });
             const response = JSON.parse(result.content[0].text);
             expect(response.error).toContain("Pagination argument 'first' exceeds the maximum allowed limit of 100.");
         });
@@ -201,7 +201,7 @@ describe('setTypedArgument', () => {
             const complexityError = "Input is too complex: Exceeded maximum depth of 10";
             vi.mocked(sharedUtils.validateInputComplexity).mockReturnValue(complexityError);
 
-            const result = await setTypedArgumentTool.handler({ sessionId, fieldPath: 'characters', argumentName: 'name', value: { complex: "object" } });
+            const result = await setTypedArgumentTool.handler({ sessionId, currentPath: 'characters', argumentName: 'name', value: { complex: "object" } });
             const response = JSON.parse(result.content[0].text);
             expect(response.error).toEqual(complexityError);
             expect(mockedSaveQueryState).not.toHaveBeenCalled();
