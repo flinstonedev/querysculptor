@@ -80,7 +80,16 @@ async function waitForRedisReady(): Promise<void> {
 
     let backoff = 250;
     const maxBackoff = 5000;
+    const maxWaitTime = 10000; // Maximum 10 seconds to wait for Redis
+    const startTime = Date.now();
+    
     while (!(redis as any).isReady) {
+        // Check if we've exceeded maximum wait time
+        if (Date.now() - startTime > maxWaitTime) {
+            console.warn('Redis connection timeout after 10 seconds, giving up');
+            throw new Error('Redis connection timeout');
+        }
+        
         await delay(backoff);
         backoff = Math.min(maxBackoff, Math.floor(backoff * 1.5));
         // Kick the client in case connect wasn't called yet or ended
@@ -167,13 +176,22 @@ async function withRedisRetry<T>(label: string, op: () => Promise<T>): Promise<T
     // Ensure Redis is connected (retry until ready)
     await waitForRedisReady();
     let attempt = 0;
+    const maxAttempts = 5; // Limit retry attempts to prevent infinite loops
+    
     // Use capped exponential backoff for op-level retry
-    while (true) {
+    while (attempt < maxAttempts) {
         try {
             return await op();
         } catch (err: any) {
             attempt++;
-            console.warn(`[${label}] Redis operation failed (attempt ${attempt}): ${err?.message || err}`);
+            console.warn(`[${label}] Redis operation failed (attempt ${attempt}/${maxAttempts}): ${err?.message || err}`);
+            
+            // If we've exhausted all attempts, throw the error
+            if (attempt >= maxAttempts) {
+                console.error(`[${label}] Redis operation failed after ${maxAttempts} attempts, giving up`);
+                throw new Error(`Redis operation failed: ${err?.message || err}`);
+            }
+            
             // If client not ready, wait and try to reconnect
             if (!(redis as any).isReady) {
                 await delay(REDIS_OPERATION_RETRY_MS);
@@ -185,6 +203,9 @@ async function withRedisRetry<T>(label: string, op: () => Promise<T>): Promise<T
             await delay(sleep);
         }
     }
+    
+    // This should never be reached due to the throw above, but TypeScript needs it
+    throw new Error(`[${label}] Unexpected end of retry loop`);
 }
 
 function normalizeSessionId(sessionId: string): string {

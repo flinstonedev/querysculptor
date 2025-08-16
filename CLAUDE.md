@@ -64,3 +64,17 @@ QuerySculptor is an MCP (Model Context Protocol) server that provides tools for 
 - Unit tests for individual tools
 - Integration tests for complete workflows
 - Test helpers for mocking GraphQL schemas
+
+**Deployment & Configuration:**
+- Vercel deployment with `vercel.json` configuration
+- Environment-based configuration via `.env` file
+- Rate limiting with Redis backend
+- Fallback to in-memory storage for development
+- Security headers and CORS configuration for MCP endpoint
+
+**Important Files:**
+- `api/server.ts`: Main MCP server entry point
+- `tools/index.ts`: Tool registration and catalog
+- `tools/shared-utils.ts`: Common utilities and Redis session management
+- `vercel.json`: Deployment configuration and routing
+- `vitest.config.ts`: Test configuration with proper GraphQL module resolution
