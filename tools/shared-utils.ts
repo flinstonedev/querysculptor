@@ -19,6 +19,8 @@ import {
     GraphQLInt,
     GraphQLFloat,
     GraphQLBoolean,
+    GraphQLList,
+    GraphQLNonNull,
     parse,
     validate,
     buildSchema,
@@ -1233,6 +1235,81 @@ export class GraphQLValidationUtils {
         }
 
         return { valid: warnings.length === 0, warnings };
+    }
+
+    /**
+     * Validate variable values against their schema definition and GraphQL document
+     */
+    static validateVariableValues(
+        schema: GraphQLSchema,
+        document: any,
+        variableValues: Record<string, any>
+    ): { valid: boolean; errors?: string[] } {
+        try {
+            // Use GraphQL's coerceInputValue to validate variables properly
+            const operationDefinition = document.definitions.find((def: any) => def.kind === 'OperationDefinition');
+            
+            if (!operationDefinition || !operationDefinition.variableDefinitions) {
+                return { valid: true }; // No variables to validate
+            }
+
+            const errors: string[] = [];
+
+            for (const variableDef of operationDefinition.variableDefinitions) {
+                const variableName = variableDef.variable.name.value;
+                const variableType = variableDef.type;
+                
+                // Variable values are stored with $ prefix, but GraphQL AST uses names without $
+                const variableKey = `$${variableName}`;
+                if (variableValues.hasOwnProperty(variableKey)) {
+                    const value = variableValues[variableKey];
+                    
+                    try {
+                        // Convert the type AST to a GraphQL type
+                        const type = this.typeFromAST(schema, variableType);
+                        if (type) {
+                            // Use GraphQL's built-in coerceInputValue for proper validation
+                            coerceInputValue(value, type);
+                        }
+                    } catch (error) {
+                        errors.push(`Variable $${variableName}: ${error instanceof Error ? error.message : String(error)}`);
+                    }
+                } else if (variableDef.type.kind === 'NonNullType') {
+                    // Required variable is missing
+                    if (!variableDef.defaultValue) {
+                        errors.push(`Variable $${variableName} is required but not provided`);
+                    }
+                }
+            }
+
+            return {
+                valid: errors.length === 0,
+                errors: errors.length > 0 ? errors : undefined
+            };
+        } catch (error) {
+            return {
+                valid: false,
+                errors: [`Variable validation failed: ${error instanceof Error ? error.message : String(error)}`]
+            };
+        }
+    }
+
+    /**
+     * Convert a type AST node to a GraphQL type
+     */
+    private static typeFromAST(schema: GraphQLSchema, typeNode: any): any {
+        switch (typeNode.kind) {
+            case 'NamedType':
+                return schema.getType(typeNode.name.value);
+            case 'ListType':
+                const listType = this.typeFromAST(schema, typeNode.type);
+                return listType ? new GraphQLList(listType) : null;
+            case 'NonNullType':
+                const nonNullType = this.typeFromAST(schema, typeNode.type);
+                return nonNullType ? new GraphQLNonNull(nonNullType) : null;
+            default:
+                return null;
+        }
     }
 }
 

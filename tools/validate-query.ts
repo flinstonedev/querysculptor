@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { QueryState, loadQueryState, buildQueryFromStructure, GraphQLValidationUtils, fetchAndCacheSchema, analyzeQueryComplexity } from "./shared-utils.js";
-import { parse, validate } from 'graphql';
+import { parse } from 'graphql';
 
 // Core business logic - testable function
 export async function validateGraphQLQuery(sessionId: string): Promise<{
@@ -57,16 +57,61 @@ export async function validateGraphQLQuery(sessionId: string): Promise<{
                 queryState.variablesDefaults
             );
 
-            // Use GraphQL schema validation for detailed error reporting
-            const graphqlValidation = GraphQLValidationUtils.validateAgainstSchema(queryString, schema);
-
-            // Get complexity analysis
+            // Validate with actual variable values if they exist
+            const variablesToValidate = queryState.variablesValues || queryState.variablesDefaults || {};
+            
+            // Get complexity analysis first 
             const complexityAnalysis = analyzeQueryComplexity(
                 queryState.queryStructure,
                 queryState.operationType
             );
 
             const allWarnings = [...(validation.warnings || []), ...(complexityAnalysis.warnings || [])];
+            
+            // Use GraphQL schema validation for detailed error reporting
+            const graphqlValidation = GraphQLValidationUtils.validateAgainstSchema(queryString, schema);
+            
+            // Additionally validate variable values if they exist (this fixes the core issue)
+            if (Object.keys(variablesToValidate).length > 0 && graphqlValidation.valid) {
+                try {
+                    const documentNode = parse(queryString);
+                    const variableValidation = GraphQLValidationUtils.validateVariableValues(
+                        schema, 
+                        documentNode, 
+                        variablesToValidate
+                    );
+                    
+                    if (!variableValidation.valid) {
+                        return {
+                            valid: false,
+                            errors: variableValidation.errors || ['Variable validation failed'],
+                            warnings: allWarnings,
+                            query: queryString,
+                            complexity: {
+                                depth: complexityAnalysis.depth,
+                                fieldCount: complexityAnalysis.fieldCount,
+                                complexityScore: complexityAnalysis.complexityScore,
+                                warnings: complexityAnalysis.warnings,
+                            }
+                        };
+                    }
+                } catch (parseError) {
+                    // If parsing fails, the graphqlValidation above should have caught it
+                    // This is a fallback for variable-specific parsing issues
+                    return {
+                        valid: false,
+                        errors: [`Variable validation parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`],
+                        warnings: allWarnings,
+                        query: queryString,
+                        complexity: {
+                            depth: complexityAnalysis.depth,
+                            fieldCount: complexityAnalysis.fieldCount,
+                            complexityScore: complexityAnalysis.complexityScore,
+                            warnings: complexityAnalysis.warnings,
+                        }
+                    };
+                }
+            }
 
             if (!graphqlValidation.valid) {
                 return {

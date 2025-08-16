@@ -402,6 +402,10 @@ describe('Integration Tests - Complete Query Building Workflow', () => {
         const { setVariableValue } = await import('../../tools/set-variable-value');
         const valueResult = await setVariableValue('integration-test-session', '$characterId', '1');
         expect(valueResult.success).toBe(true);
+        
+        // Set value for the required includeStatus variable
+        const includeValueResult = await setVariableValue('integration-test-session', '$includeStatus', true);
+        expect(includeValueResult.success).toBe(true);
 
         // Step 4: Set variable argument (instead of string argument to use the declared variable)
         const variableArgResult = await setVariableArgument('integration-test-session', 'user', 'id', '$characterId');
