@@ -68,8 +68,7 @@ QuerySculptor is an MCP (Model Context Protocol) server that provides tools for 
 **Deployment & Configuration:**
 - Vercel deployment with `vercel.json` configuration
 - Environment-based configuration via `.env` file
-- Rate limiting with Redis backend
-- Fallback to in-memory storage for development
+- Rate limiting with Redis backend (required)
 - Security headers and CORS configuration for MCP endpoint
 
 **Important Files:**

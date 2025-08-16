@@ -123,7 +123,7 @@ async function initializeRedis(): Promise<boolean> {
 
                 redis.on('error', (err: Error) => {
                     if (!connectionSucceeded) {
-                        console.log('Redis not available, using in-memory session storage for development');
+                        console.error('Redis connection failed:', err.message);
                         useRedis = false;
                     } else {
                         console.warn('Redis error after successful connection:', err.message);
@@ -162,7 +162,7 @@ async function initializeRedis(): Promise<boolean> {
                 console.log('Redis connection verified');
 
             } catch (error) {
-                console.log('Redis connection failed, using in-memory storage for development');
+                console.error('Redis connection failed:', error instanceof Error ? error.message : String(error));
                 useRedis = false;
             }
         })();

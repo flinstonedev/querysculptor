@@ -104,7 +104,6 @@ query GetUserWithPostsAndComments($userId: ID!, $postLimit: Int = 10) {
 
 ### **🤝 Compatibility**
 - MCP Standard - works with Claude Desktop, Cursor, and other MCP clients
-- RESTful fallback for use without MCP clients
 - TypeScript native with full type safety
 
 ## 📋 **Requirements**
