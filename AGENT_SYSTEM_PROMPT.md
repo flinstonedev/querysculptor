@@ -53,9 +53,16 @@ Always follow this sequence:
 
 ## Best Practices
 
+### API Consistency
+- All tools use `currentPath` parameter for dot-notation paths (e.g., "user.profile", "search.edges.node")
+- Argument tools (set-string-argument, set-typed-argument, etc.) use `currentPath` to specify the field location
+- Selection tools (select-field, apply-inline-frag, etc.) use `currentPath` to specify where to add fields
+- No more `fieldPath` or `parentPath` - everything is `currentPath` for consistency
+
 ### Session Management
 - Always start with start-query-session
-- Reuse the exact sessionId across all calls (no trimming/reformatting)
+- Reuse the exact sessionId across all calls (system handles normalization automatically)
+- Session IDs are validated and normalized (trimmed, security-checked) internally
 - Use get-current-query before complex steps to confirm session/state
 
 ### Schema Exploration
@@ -82,21 +89,24 @@ Always follow this sequence:
 
 ### Basic Query Pattern
 ```
-start-query-session → introspect-schema → select-field("users") →
-set-string-argument("users", "filter", "active") → validate-query → execute-query
+start-query-session → introspect-schema → select-field(currentPath: "", fieldName: "users") →
+set-string-argument(currentPath: "users", argumentName: "filter", value: "active") → 
+validate-query → execute-query
 ```
 
 ### Mutation Pattern
 ```
 start-query-session → introspect-schema → get-input-object-help("UserInput") →
-select-field("createUser") → set-input-object-argument("createUser", "input", {...}) →
+select-field(currentPath: "", fieldName: "createUser") → 
+set-input-object-argument(currentPath: "createUser", argumentName: "input", objectPath: "name", value: "John") →
 validate-query → execute-query
 ```
 
 ### Variables Pattern
 ```
 start-query-session → introspect-schema → set-query-variable("$userId", "ID!") →
-select-field("user") → set-variable-argument("user", "id", "$userId") →
+select-field(currentPath: "", fieldName: "user") → 
+set-variable-argument(currentPath: "user", argumentName: "id", variableName: "$userId") →
 set-variable-value("$userId", "123") → validate-query → execute-query
 ```
 
@@ -107,7 +117,7 @@ When a path’s type is a union/interface (e.g., GitHub search `search.edges.nod
 2) Check possible types with get-selections at `currentPath: "search.edges.node"`
 3) Apply inline fragment using apply-inline-frag
 
-Valid call (supports both currentPath/parentPath and onType/typeName):
+Valid call (use currentPath consistently across all tools):
 ```json
 {
   "sessionId": "<SESSION_ID>",
@@ -127,11 +137,19 @@ Do NOT try to add a field named `"... on Repository { ... }"` via select-multi-f
 ## Error Recovery
 
 Common issues & solutions:
-- "Session not found": verify exact sessionId; call get-current-query; if absent, start a new session and rebuild
-- "Field not found": confirm with get-type-info/get-field-info; ensure parentPath exists
+- "Session not found": verify sessionId; call get-current-query; if absent, start a new session and rebuild
+- "Field not found": confirm with get-type-info/get-field-info; ensure currentPath exists
 - "Invalid argument": check get-field-info for requirements
 - "Type mismatch": use get-type-info to confirm types
 - "Validation failed": inspect get-current-query output and adjust
+- "Path not found": ensure you're using currentPath parameter consistently across all tools
+- "Session ID validation errors": session IDs are automatically validated for security and format
+
+### Enhanced Session Validation
+- Session IDs are automatically validated and normalized
+- Whitespace trimming handled internally
+- Security validation prevents injection attacks
+- Clear error messages for invalid session formats
 
 ## Response Handling
 
@@ -147,4 +165,4 @@ Always check errors and warnings; validate before executing.
 - Use variables for dynamic inputs
 - Monitor complexity; simplify when warned
 
-Remember: build incrementally, validate continuously, and apply inline fragments for unions/interfaces at the correct parent path.
+Remember: build incrementally, validate continuously, use `currentPath` consistently across all tools, and apply inline fragments for unions/interfaces at the correct path.

@@ -1,7 +1,7 @@
 {
   "name": "querysculptor",
   "version": "0.1.0",
-  "description": "⚒️ QuerySculptor - Craft GraphQL queries with AI agents using MCP tools",
+  "description": "⚒️ QuerySculptor - Craft GraphQL queries with AI agents using MCP tools. Reliable session management and comprehensive agent testing.",
   "main": "index.js",
   "type": "module",
   "scripts": {
@@ -10,7 +10,11 @@
     "test": "NODE_ENV=test vitest",
     "test:watch": "NODE_ENV=test vitest --watch",
     "test:ui": "NODE_ENV=test vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:agent": "tsx tests/agent-testing/run-agent-tests.ts",
+    "test:agent:basic": "tsx tests/agent-testing/run-agent-tests.ts --basic",
+    "test:agent:debug": "tsx tests/agent-testing/run-agent-tests.ts --debug",
+    "test:agent:errors": "tsx tests/agent-testing/run-agent-tests.ts --errors"
   },
   "keywords": [
     "graphql",

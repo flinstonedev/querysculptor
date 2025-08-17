@@ -227,9 +227,22 @@ async function withRedisRetry<T>(label: string, op: () => Promise<T>): Promise<T
 }
 
 function normalizeSessionId(sessionId: string): string {
-    const raw = (sessionId || '').trim();
-    // For MCP usage, allow any non-empty trimmed string as session ID
-    return raw;
+    if (!sessionId || typeof sessionId !== 'string') {
+        throw new Error('Session ID must be a non-empty string');
+    }
+    
+    const normalized = sessionId.trim();
+    
+    if (normalized === '') {
+        throw new Error('Session ID cannot be empty or just whitespace');
+    }
+    
+    // Basic security: prevent Redis key injection
+    if (normalized.includes(':') || normalized.includes('\n') || normalized.includes('\r')) {
+        throw new Error('Session ID contains invalid characters');
+    }
+    
+    return normalized;
 }
 
 // Schema caching

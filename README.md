@@ -100,7 +100,8 @@ query GetUserWithPostsAndComments($userId: ID!, $postLimit: Int = 10) {
 - Redis-backed sessions for persistent state across interactions
 - Rate limiting for API protection
 - Vercel deployment ready
-- Comprehensive test coverage
+- Comprehensive test coverage including agent-like workflow testing
+- Session persistence fixes for reliable inline fragment operations
 
 ### **🤝 Compatibility**
 - MCP Standard - works with Claude Desktop, Cursor, and other MCP clients
@@ -329,14 +330,58 @@ Configure these environment variables in your Vercel dashboard:
 - `DEFAULT_GRAPHQL_ENDPOINT` - your GraphQL API endpoint
 - `DEFAULT_GRAPHQL_HEADERS` - JSON string with default headers for the GraphQL API (optional)
 
+## 🧪 **Testing**
+
+QuerySculptor includes comprehensive testing frameworks:
+
+### **Standard Tests**
+```bash
+pnpm test            # Run all tests
+pnpm test:watch      # Watch mode
+pnpm test:coverage   # Coverage report
+```
+
+### **Agent-Like Testing**
+Test tools exactly as AI agents would use them:
+```bash
+pnpm test:agent                  # Run all agent workflow tests
+pnpm test:agent:basic           # Basic workflow tests
+pnpm test:agent:debug           # Debug mode with detailed output
+pnpm test:agent:errors          # Error scenario tests
+```
+
+The agent testing framework:
+- ✅ **Real MCP Protocol**: Tests through actual MCP communication layer
+- ✅ **Session Persistence**: Validates Redis-backed session management
+- ✅ **Workflow Simulation**: Executes realistic multi-step agent workflows
+- ✅ **Error Recovery**: Tests common failure modes and recovery patterns
+- ✅ **Debug Utilities**: Detailed analysis and debugging capabilities
+
+## 🔧 **Recent Fixes (2025)**
+
+### **Session Persistence Issue Resolved**
+- **Problem**: Agents experienced "session not found" errors during `apply-inline-frag` operations
+- **Root Cause**: Aggressive session ID normalization was mangling custom session IDs
+- **Solution**: Rewritten session normalization with proper validation and security checks
+- **Impact**: Agents can now use custom session IDs and maintain session state reliably throughout complex workflows
+- **Testing**: Comprehensive agent testing framework ensures the fix works in real-world scenarios
+
+### **Enhanced Session Security**
+- Session ID validation prevents injection attacks
+- Proper whitespace handling and normalization
+- Clear error messages for invalid session formats
+- Backwards compatible with existing implementations
+
 ## 📈 **Roadmap**
 
-- [ ] **Add proper logging** - Web UI for query construction
+- [ ] **Add proper logging** - Structured logging for debugging and monitoring
 - [ ] **Query Optimization AI** - Automatic performance improvements  
 - [ ] **Visual Query Builder** - Web UI for query construction
+- [ ] **Enhanced Agent Testing** - Expand agent workflow test coverage
 
 ### **🌟 Community Contributions Welcome**
 - **Documentation improvements** - Help others understand the project
 - **Tool enhancements** - Add new capabilities
 - **Client integrations** - Support more MCP clients
 - **Performance optimizations** - Improve performance
+- **Agent testing scenarios** - Add more real-world workflow tests
