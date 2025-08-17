@@ -228,9 +228,8 @@ async function withRedisRetry<T>(label: string, op: () => Promise<T>): Promise<T
 
 function normalizeSessionId(sessionId: string): string {
     const raw = (sessionId || '').trim();
-    // Our session IDs are hex strings (randomBytes(16)). Strip non-hex and normalize case.
-    const cleaned = raw.replace(/[^a-fA-F0-9]/g, '').toLowerCase();
-    return cleaned || raw; // fallback to raw if nothing left after cleaning
+    // For MCP usage, allow any non-empty trimmed string as session ID
+    return raw;
 }
 
 // Schema caching
