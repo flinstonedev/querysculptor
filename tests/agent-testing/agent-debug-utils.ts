@@ -115,10 +115,10 @@ export class AgentDebugHelper {
                 sessionId
             });
 
-            if (!response.success) {
+            if (response.error) {
                 return {
                     exists: false,
-                    issues: [response.error || 'Session not found']
+                    issues: [response.error]
                 };
             }
 

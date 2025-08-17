@@ -75,7 +75,7 @@ describe('Agent Inline Fragment Fix', () => {
         const inlineFragResponse = await agentClient.callTool('apply-inline-frag', {
             sessionId,
             currentPath: 'abilities.results',
-            typeName: 'Ability',  // Assuming this is a valid type for Pokemon API
+            typeName: 'BaseName',  // Correct type for Pokemon API
             fieldNames: ['name', 'url']
         });
 
@@ -220,7 +220,7 @@ describe('Agent Inline Fragment Fix', () => {
         const criticalResponse = await agentClient.callTool('apply-inline-frag', {
             sessionId,
             currentPath: 'abilities.results',
-            typeName: 'Ability',
+            typeName: 'BaseName',
             fieldNames: ['name', 'url']
         });
 

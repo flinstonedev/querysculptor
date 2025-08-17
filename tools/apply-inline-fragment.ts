@@ -11,7 +11,7 @@ export async function applyInlineFragment(
     success?: boolean;
     message?: string;
     onType?: string;
-    parentPath?: string;
+    currentPath?: string;
     fieldNames?: string[];
     error?: string;
 }> {
@@ -72,7 +72,7 @@ export async function applyInlineFragment(
             success: true,
             message: `Inline fragment on type '${onType}' applied at path '${currentPath}' with ${fieldNames.length} fields.`,
             onType,
-            parentPath: currentPath,
+            currentPath: currentPath,
             fieldNames
         };
     } catch (error) {

@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils, fetchAndCacheSchema } from "./shared-utils.js";
-import { isObjectType, isInterfaceType, getNamedType, GraphQLObjectType, GraphQLInterfaceType, GraphQLFieldMap, GraphQLField, GraphQLNamedType } from 'graphql';
+import { loadQueryState, saveQueryState, GraphQLValidationUtils, fetchAndCacheSchema } from "./shared-utils.js";
 
 // Core business logic - testable function
 export async function selectMultipleFields(
@@ -11,7 +10,7 @@ export async function selectMultipleFields(
     success?: boolean;
     message?: string;
     selectedFields?: string[];
-    parentPath?: string;
+    currentPath?: string;
     error?: string;
 }> {
     try {
@@ -98,7 +97,7 @@ export async function selectMultipleFields(
             success: true,
             message: `Successfully selected ${addedFields.length} fields at path '${currentPath}': ${addedFields.join(', ')}.`,
             selectedFields: addedFields,
-            parentPath: currentPath
+            currentPath: currentPath
         };
     } catch (error) {
         return {

@@ -6,7 +6,12 @@ export default defineConfig({
         environment: 'node',
         setupFiles: ['tests/core/setup.ts'],
         include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-        exclude: ['**/node_modules/**', '**/dist/**'],
+        exclude: [
+            '**/node_modules/**', 
+            '**/dist/**',
+            // Exclude agent tests by default - they require Redis and should be run explicitly
+            process.env.USE_REAL_REDIS !== 'true' ? 'tests/agent-testing/**' : ''
+        ].filter(Boolean),
         testTimeout: 10000,
         hookTimeout: 10000,
         coverage: {

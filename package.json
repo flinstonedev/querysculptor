@@ -11,10 +11,10 @@
     "test:watch": "NODE_ENV=test vitest --watch",
     "test:ui": "NODE_ENV=test vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "test:agent": "tsx tests/agent-testing/run-agent-tests.ts",
-    "test:agent:basic": "tsx tests/agent-testing/run-agent-tests.ts --basic",
-    "test:agent:debug": "tsx tests/agent-testing/run-agent-tests.ts --debug",
-    "test:agent:errors": "tsx tests/agent-testing/run-agent-tests.ts --errors"
+    "test:agent": "USE_REAL_REDIS=true vitest tests/agent-testing/",
+    "test:agent:basic": "USE_REAL_REDIS=true vitest tests/agent-testing/agent-inline-fragment-fix.test.ts",
+    "test:agent:debug": "USE_REAL_REDIS=true vitest tests/agent-testing/ --reporter=verbose",
+    "test:agent:errors": "USE_REAL_REDIS=true vitest tests/agent-testing/error-scenario-tests.test.ts"
   },
   "keywords": [
     "graphql",

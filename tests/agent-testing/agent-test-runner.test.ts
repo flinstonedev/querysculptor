@@ -26,7 +26,11 @@ describe('Agent-Like Workflow Tests', () => {
         // These tests need real Redis for session persistence
         // Set up test environment
         process.env.NODE_ENV = 'test';
-        process.env.DEFAULT_GRAPHQL_ENDPOINT = 'http://localhost:4000/graphql';
+        if (process.env.USE_REAL_REDIS) {
+            process.env.DEFAULT_GRAPHQL_ENDPOINT = 'https://graphql-pokeapi.graphcdn.app';
+        } else {
+            process.env.DEFAULT_GRAPHQL_ENDPOINT = 'http://localhost:4000/graphql';
+        }
     });
 
     beforeEach(async () => {
@@ -54,9 +58,9 @@ describe('Agent-Like Workflow Tests', () => {
             // Verify final query was generated
             const finalStep = result.steps[result.steps.length - 1];
             expect(finalStep.response).toMatchObject({
-                success: true,
-                queryString: expect.stringContaining('users')
+                queryString: expect.stringContaining('abilities')
             });
+            expect(finalStep.response.error).toBeUndefined();
         }, 30000);
 
         it('should maintain session persistence across multiple calls', async () => {
@@ -84,7 +88,8 @@ describe('Agent-Like Workflow Tests', () => {
             
             // Start session normally
             const sessionResponse = await agentClient.callTool('start-query-session');
-            expect(sessionResponse.success).toBe(true);
+            expect(sessionResponse.sessionId).toBeDefined();
+            expect(sessionResponse.error).toBeUndefined();
             
             const realSessionId = sessionResponse.sessionId;
             
@@ -92,24 +97,24 @@ describe('Agent-Like Workflow Tests', () => {
             const buildResponse = await agentClient.callTool('select-field', {
                 sessionId: realSessionId,
                 currentPath: '',
-                fieldName: 'users'
+                fieldName: 'pokemon'
             });
-            expect(buildResponse.success).toBe(true);
+            expect(buildResponse.error).toBeUndefined();
             
             // Verify session persists
             const queryResponse = await agentClient.callTool('get-current-query', {
                 sessionId: realSessionId
             });
-            expect(queryResponse.success).toBe(true);
-            expect(queryResponse.queryString).toContain('users');
+            expect(queryResponse.error).toBeUndefined();
+            expect(queryResponse.queryString).toContain('pokemon');
         });
 
         it('should properly handle invalid session IDs', async () => {
             const result = await agentClient.runScenario(invalidSessionTest);
             
-            // This scenario expects errors, so success=false is correct
-            expect(result.success).toBe(false);
-            expect(result.errors.length).toBeGreaterThan(0);
+            // This scenario expects errors and should handle them correctly, so success=true
+            expect(result.success).toBe(true);
+            expect(result.errors).toHaveLength(0); // No unexpected errors
             
             // Verify each step that should fail actually failed
             for (const step of result.steps) {
@@ -130,19 +135,19 @@ describe('Agent-Like Workflow Tests', () => {
             const beforeCleanup = await agentClient.callTool('get-current-query', {
                 sessionId
             });
-            expect(beforeCleanup.success).toBe(true);
+            expect(beforeCleanup.error).toBeUndefined();
             
             // End session
             const endResponse = await agentClient.callTool('end-query-session', {
                 sessionId
             });
-            expect(endResponse.success).toBe(true);
+            expect(endResponse.error).toBeUndefined();
             
             // Verify session is gone
             const afterCleanup = await agentClient.callTool('get-current-query', {
                 sessionId
             });
-            expect(afterCleanup.success).toBe(false);
+            expect(afterCleanup.error).toBeDefined();
             expect(afterCleanup.error).toMatch(/Session.*not found/);
         });
     });
@@ -156,12 +161,12 @@ describe('Agent-Like Workflow Tests', () => {
             
             // Verify the scenario properly handled the error and recovered
             const steps = result.steps;
-            expect(steps[1].success).toBe(false); // The error step
+            expect(steps[1].response.error).toBeDefined(); // The error step
             expect(steps[1].response.error).toMatch(/Field.*not found/);
             
             // But later steps should succeed
-            expect(steps[3].success).toBe(true); // Recovery step
-            expect(steps[4].success).toBe(true); // Validation step
+            expect(steps[3].response.error).toBeUndefined(); // Recovery step
+            expect(steps[4].response.error).toBeUndefined(); // Validation step
         });
 
         it('should provide helpful error messages for common mistakes', async () => {
@@ -175,7 +180,6 @@ describe('Agent-Like Workflow Tests', () => {
                 value: 'test'
             });
             
-            expect(argResponse.success).toBe(false);
             expect(argResponse.error).toBeDefined();
             expect(argResponse.error).toMatch(/Field.*not found/);
         });
@@ -191,7 +195,7 @@ describe('Agent-Like Workflow Tests', () => {
                 variableName: '$testVar',
                 variableType: 'String!'
             });
-            expect(defineResponse.success).toBe(true);
+            expect(defineResponse.error).toBeUndefined();
             
             // Set variable value
             const valueResponse = await agentClient.callTool('set-variable-value', {
@@ -199,18 +203,18 @@ describe('Agent-Like Workflow Tests', () => {
                 variableName: '$testVar',
                 value: 'test value'
             });
-            expect(valueResponse.success).toBe(true);
+            expect(valueResponse.error).toBeUndefined();
             
             // Use in query
             await agentClient.callTool('select-field', {
                 sessionId,
                 currentPath: '',
-                fieldName: 'users'
+                fieldName: 'pokemon'
             });
             
-            const argResponse = await agentClient.callTool('set-variable-argument', {
+            const argResponse = await agentClient.callTool('set-var-arg', {
                 sessionId,
-                currentPath: 'users',
+                currentPath: 'pokemon',
                 argumentName: 'filter',
                 variableName: '$testVar'
             });
@@ -232,22 +236,22 @@ describe('Agent-Like Workflow Tests', () => {
                 () => agentClient.callTool('select-field', {
                     sessionId,
                     currentPath: '',
-                    fieldName: 'users'
+                    fieldName: 'abilities'
                 }),
                 () => agentClient.callTool('select-multi-fields', {
                     sessionId,
-                    currentPath: 'users',
-                    fieldNames: ['id', 'name', 'email']
+                    currentPath: 'abilities',
+                    fieldNames: ['count', 'next', 'previous']
                 }),
                 () => agentClient.callTool('select-field', {
                     sessionId,
-                    currentPath: 'users',
-                    fieldName: 'posts'
+                    currentPath: 'abilities',
+                    fieldName: 'results'
                 }),
                 () => agentClient.callTool('select-multi-fields', {
                     sessionId,
-                    currentPath: 'users.posts',
-                    fieldNames: ['id', 'title']
+                    currentPath: 'abilities.results',
+                    fieldNames: ['name', 'url']
                 }),
                 () => agentClient.callTool('validate-query', {
                     sessionId
@@ -257,22 +261,22 @@ describe('Agent-Like Workflow Tests', () => {
             // Execute each step
             for (let i = 0; i < steps.length; i++) {
                 const response = await steps[i]();
-                expect(response.success).toBe(true);
+                expect(response.error).toBeUndefined();
                 
                 // Verify session state persists between steps
                 const queryState = await agentClient.callTool('get-current-query', {
                     sessionId
                 });
-                expect(queryState.success).toBe(true);
+                expect(queryState.error).toBeUndefined();
             }
             
             // Final validation
             const finalQuery = await agentClient.callTool('get-current-query', {
                 sessionId
             });
-            expect(finalQuery.success).toBe(true);
-            expect(finalQuery.queryString).toContain('users');
-            expect(finalQuery.queryString).toContain('posts');
+            expect(finalQuery.error).toBeUndefined();
+            expect(finalQuery.queryString).toContain('abilities');
+            expect(finalQuery.queryString).toContain('results');
         }, 30000);
     });
 
@@ -280,12 +284,13 @@ describe('Agent-Like Workflow Tests', () => {
         it('should handle rapid successive calls', async () => {
             const sessionId = await agentClient.startSession();
             
-            // Make rapid successive calls
-            const promises = Array.from({ length: 5 }, (_, i) => 
+            // Make rapid successive calls with valid Pokemon API fields
+            const validFields = ['abilities', 'berries', 'eggGroups', 'genders', 'growthRates'];
+            const promises = validFields.map(fieldName => 
                 agentClient.callTool('select-field', {
                     sessionId,
                     currentPath: '',
-                    fieldName: `field${i}`
+                    fieldName
                 })
             );
             
@@ -293,7 +298,7 @@ describe('Agent-Like Workflow Tests', () => {
             
             // At least the first call should succeed (even if others fail due to invalid fields)
             const successCount = results.filter(r => 
-                r.status === 'fulfilled' && r.value.success
+                r.status === 'fulfilled' && !r.value.error
             ).length;
             
             expect(successCount).toBeGreaterThan(0);

@@ -357,15 +357,6 @@ The agent testing framework:
 - ✅ **Error Recovery**: Tests common failure modes and recovery patterns
 - ✅ **Debug Utilities**: Detailed analysis and debugging capabilities
 
-## 🔧 **Recent Fixes (2025)**
-
-### **Session Persistence Issue Resolved**
-- **Problem**: Agents experienced "session not found" errors during `apply-inline-frag` operations
-- **Root Cause**: Aggressive session ID normalization was mangling custom session IDs
-- **Solution**: Rewritten session normalization with proper validation and security checks
-- **Impact**: Agents can now use custom session IDs and maintain session state reliably throughout complex workflows
-- **Testing**: Comprehensive agent testing framework ensures the fix works in real-world scenarios
-
 ### **Enhanced Session Security**
 - Session ID validation prevents injection attacks
 - Proper whitespace handling and normalization

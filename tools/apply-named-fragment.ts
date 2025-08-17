@@ -9,7 +9,7 @@ export async function applyNamedFragment(
 ): Promise<{
     success?: boolean;
     message?: string;
-    parentPath?: string;
+    currentPath?: string;
     fragmentName?: string;
     error?: string;
 }> {
@@ -66,7 +66,7 @@ export async function applyNamedFragment(
             success: true,
             message: `Fragment '${fragmentName}' applied at path '${currentPath}'.`,
             fragmentName,
-            parentPath: currentPath
+            currentPath: currentPath
         };
     } catch (error) {
         return {

@@ -300,7 +300,7 @@ export const errorRecoveryScenario: AgentTestScenario = {
             parameters: {
                 sessionId: '{{sessionId}}',
                 currentPath: '',
-                fieldName: 'users'
+                fieldName: 'pokemon'
             },
             expectedResponse: { success: true },
             description: 'Select valid field instead'
@@ -343,7 +343,7 @@ export const invalidSessionTest: AgentTestScenario = {
             parameters: {
                 sessionId: 'invalid-session-123',
                 currentPath: '',
-                fieldName: 'users'
+                fieldName: 'pokemon'
             },
             expectedResponse: {
                 error: /Session.*not found/
@@ -396,7 +396,7 @@ export const complexQueryScenario: AgentTestScenario = {
             parameters: {
                 sessionId: '{{sessionId}}',
                 currentPath: '',
-                fieldName: 'users'
+                fieldName: 'pokemon'
             },
             expectedResponse: { success: true },
             description: 'Select users field'
@@ -406,7 +406,7 @@ export const complexQueryScenario: AgentTestScenario = {
             toolName: 'set-variable-argument',
             parameters: {
                 sessionId: '{{sessionId}}',
-                currentPath: 'users',
+                currentPath: 'pokemon',
                 argumentName: 'limit',
                 variableName: '$limit'
             },
@@ -418,7 +418,7 @@ export const complexQueryScenario: AgentTestScenario = {
             toolName: 'select-multi-fields',
             parameters: {
                 sessionId: '{{sessionId}}',
-                currentPath: 'users',
+                currentPath: 'pokemon',
                 fieldNames: ['id', 'name', 'email']
             },
             expectedResponse: { success: true },
@@ -429,8 +429,8 @@ export const complexQueryScenario: AgentTestScenario = {
             toolName: 'select-field',
             parameters: {
                 sessionId: '{{sessionId}}',
-                currentPath: 'users',
-                fieldName: 'posts'
+                currentPath: 'pokemon',
+                fieldName: 'results'
             },
             expectedResponse: { success: true },
             description: 'Select nested posts field'
@@ -440,8 +440,8 @@ export const complexQueryScenario: AgentTestScenario = {
             toolName: 'select-multi-fields',
             parameters: {
                 sessionId: '{{sessionId}}',
-                currentPath: 'users.posts',
-                fieldNames: ['id', 'title']
+                currentPath: 'pokemon.results',
+                fieldNames: ['name', 'url']
             },
             expectedResponse: { success: true },
             description: 'Select post fields'
@@ -483,7 +483,7 @@ export const sessionIdFormatTest: AgentTestScenario = {
             parameters: {
                 sessionId: 'my-custom-session-123',
                 currentPath: '',
-                fieldName: 'users'
+                fieldName: 'pokemon'
             },
             expectedResponse: {
                 error: /Session.*not found/
@@ -496,7 +496,7 @@ export const sessionIdFormatTest: AgentTestScenario = {
             parameters: {
                 sessionId: '{{sessionId}}',
                 currentPath: '',
-                fieldName: 'users'
+                fieldName: 'pokemon'
             },
             expectedResponse: { success: true },
             description: 'Use proper session ID'

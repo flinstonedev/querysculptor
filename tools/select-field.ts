@@ -17,7 +17,7 @@ export async function selectGraphQLField(
 ): Promise<{
     message?: string;
     fieldKey?: string;
-    parentPath?: string;
+    currentPath?: string;
     error?: string;
 }> {
     try {
@@ -116,7 +116,7 @@ export async function selectGraphQLField(
         return {
             message: `Field '${fieldName}' selected successfully at path '${currentPath}'`,
             fieldKey: key,
-            parentPath: currentPath
+            currentPath: currentPath
         };
     } catch (error) {
         return {

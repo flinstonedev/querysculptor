@@ -3,8 +3,14 @@ import { buildSchema } from 'graphql';
 
 // Set environment variables for testing
 process.env.NODE_ENV = 'test';
-process.env.DEFAULT_GRAPHQL_ENDPOINT = 'http://localhost:4000/graphql';
-process.env.REDIS_URL = 'redis://localhost:6379';
+// Use real Redis for agent tests, localhost for unit tests
+if (process.env.CI || process.env.USE_REAL_REDIS) {
+  // Keep the existing REDIS_URL and GRAPHQL_ENDPOINT from .env for CI/integration tests
+  process.env.DEFAULT_GRAPHQL_ENDPOINT = process.env.DEFAULT_GRAPHQL_ENDPOINT || 'https://graphql-pokeapi.graphcdn.app';
+} else {
+  process.env.DEFAULT_GRAPHQL_ENDPOINT = 'http://localhost:4000/graphql';
+  process.env.REDIS_URL = 'redis://localhost:6379';
+}
 
 export const TEST_SCHEMA = buildSchema(`
   type Query {
