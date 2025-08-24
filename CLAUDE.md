@@ -19,6 +19,14 @@ pnpm test:ui         # Run tests with UI
 pnpm test:coverage   # Generate coverage report
 ```
 
+**Agent Testing (requires Redis):**
+```bash
+pnpm test:agent                  # Run all agent workflow tests
+pnpm test:agent:basic           # Basic workflow tests
+pnpm test:agent:debug           # Debug mode with detailed output
+pnpm test:agent:errors          # Error scenario tests
+```
+
 **Running specific tests:**
 ```bash
 pnpm test path/to/test.test.ts  # Run a specific test file
@@ -63,6 +71,7 @@ QuerySculptor is an MCP (Model Context Protocol) server that provides tools for 
 - Extensive test coverage with Vitest
 - Unit tests for individual tools
 - Integration tests for complete workflows
+- Agent-like workflow testing that simulates real MCP communication
 - Test helpers for mocking GraphQL schemas
 
 **Deployment & Configuration:**

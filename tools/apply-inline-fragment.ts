@@ -17,14 +17,24 @@ export async function applyInlineFragment(
 }> {
     try {
         if (!sessionId || typeof sessionId !== 'string' || sessionId.trim() === '') {
-            return { error: 'Invalid sessionId.' };
+            return { error: `Invalid sessionId. Received: ${typeof sessionId === 'string' ? `"${sessionId}"` : String(sessionId)} (type: ${typeof sessionId})` };
         }
-        // Load query state
-        const queryState = await loadQueryState(sessionId);
+        // Load query state with retry for race conditions
+        let queryState = await loadQueryState(sessionId);
         if (!queryState) {
-            return {
-                error: 'Session not found.'
-            };
+            // Retry once after a short delay in case of race condition
+            console.warn(`[apply-inline-frag] Session not found on first attempt, retrying for ID: ${sessionId}`);
+            await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
+            queryState = await loadQueryState(sessionId);
+            
+            if (!queryState) {
+                // Include more diagnostic info to help debug session issues
+                console.error(`[apply-inline-frag] Session not found after retry for ID: ${sessionId}`);
+                return {
+                    error: `Session not found. SessionId: "${sessionId}" (length: ${sessionId.length})`
+                };
+            }
+            console.log(`[apply-inline-frag] Session found on retry for ID: ${sessionId}`);
         }
 
         // Navigate to the current node in the query structure
@@ -91,7 +101,7 @@ export const applyInlineFragmentTool = {
         typeName: z.string().optional().describe('The type condition for the inline fragment (e.g., "Repository").'),
         onType: z.string().optional().describe('Alias of typeName for compatibility.'),
         fieldNames: z.array(z.string()).describe('Array of field names to select in the inline fragment.'),
-    }).refine((data) => !!(data.typeName || data.onType), { message: 'typeName (or onType) is required' }),
+    }),
     handler: async ({ sessionId, currentPath = "", onType, typeName, fieldNames }: {
         sessionId: string,
         currentPath?: string,
@@ -99,6 +109,18 @@ export const applyInlineFragmentTool = {
         typeName?: string,
         fieldNames: string[]
     }) => {
+        // Validate that either typeName or onType is provided (moved from schema.refine)
+        if (!typeName && !onType) {
+            return {
+                content: [{
+                    type: "text",
+                    text: JSON.stringify({
+                        error: 'typeName (or onType) is required'
+                    }, null, 2)
+                }],
+            };
+        }
+        
         const resolvedOnType = (typeName || onType || '').trim();
         const result = await applyInlineFragment(sessionId, currentPath, resolvedOnType, sanitizeInlineFields(fieldNames));
 
