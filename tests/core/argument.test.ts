@@ -45,6 +45,24 @@ vi.mock('../../tools/shared-utils', async () => {
     return createSharedUtilsMock({
         loadQueryState: vi.fn().mockResolvedValue(mockQueryState),
         fetchAndCacheSchema: vi.fn().mockResolvedValue(testSchema),
+        createSuccessResponse: vi.fn().mockImplementation((message: string, data?: any) => ({
+            success: true,
+            message,
+            data: data || {}
+        })),
+        createErrorResponse: vi.fn().mockImplementation((error: string, code?: string) => ({
+            success: false,
+            error,
+            code
+        })),
+        wrapToolResponse: vi.fn().mockImplementation((response: any) => ({
+            content: [{ type: 'text', text: JSON.stringify(response) }]
+        })),
+        ErrorCode: {
+            VALIDATION_ERROR: 'VALIDATION_ERROR',
+            NOT_FOUND: 'NOT_FOUND',
+            INVALID_INPUT: 'INVALID_INPUT'
+        },
         GraphQLValidationUtils: {
             getArgumentType: (schema, currentPath, argName) => {
                 const queryType = schema.getQueryType();

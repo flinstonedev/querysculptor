@@ -15,13 +15,13 @@ vi.mock('../../tools/shared-utils', async () => {
             name: String
             status: String
         }
-        
+
         type Character {
             id: ID!
             name: String
             status: String
         }
-        
+
         type Query {
             characters(filter: FilterCharacter): [Character]
         }
@@ -53,6 +53,11 @@ vi.mock('../../tools/shared-utils', async () => {
             if (!type) return 'Unknown';
             if (type.name) return type.name;
         }),
+        createSuccessResponse: vi.fn((data) => ({ success: true, data })),
+        createErrorResponse: vi.fn((error) => ({ success: false, error })),
+        wrapToolResponse: vi.fn((response) => ({
+            content: [{ type: 'text', text: JSON.stringify(response) }],
+        })),
     });
 });
 
@@ -87,8 +92,8 @@ describe('Get Input Object Help Tool Tests', () => {
         });
 
         const response = JSON.parse(result.content[0].text);
-        expect(response.inputTypeName).toBe('FilterCharacter');
-        expect(response.fields).toBeDefined();
+        expect(response.data.inputTypeName).toBe('FilterCharacter');
+        expect(response.data.fields).toBeDefined();
     });
 
     it('should handle non-existent input object type', async () => {
@@ -118,7 +123,7 @@ describe('getInputObjectHelp direct function tests', () => {
                 id: ID!
                 name: String
             }
-            
+
             type Query {
                 test: String
             }
@@ -136,10 +141,10 @@ describe('getInputObjectHelp direct function tests', () => {
         });
 
         const response = JSON.parse(result.content[0].text);
-        expect(response.inputTypeName).toBe('UserInput');
-        expect(response.fields).toHaveLength(2);
-        expect(response.fields[0].name).toBe('id');
-        expect(response.fields[1].name).toBe('name');
+        expect(response.data.inputTypeName).toBe('UserInput');
+        expect(response.data.fields).toHaveLength(2);
+        expect(response.data.fields[0].name).toBe('id');
+        expect(response.data.fields[1].name).toBe('name');
     });
 
     it('should handle schema fetch error', async () => {

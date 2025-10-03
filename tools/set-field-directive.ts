@@ -5,7 +5,10 @@ import {
     saveQueryState,
     GraphQLValidationUtils,
     fetchAndCacheSchema,
-    validateInputComplexity
+    validateInputComplexity,
+    createSuccessResponse,
+    createErrorResponse,
+    ErrorCode
 } from "./shared-utils.js";
 import { isTypeSubTypeOf, typeFromAST } from "graphql";
 import { parseType } from "graphql/language/parser.js";
@@ -17,36 +20,43 @@ export async function setFieldDirective(
     directiveName: string,
     argumentName?: string,
     argumentValue?: string | number | boolean | null
-): Promise<{
-    success?: boolean;
-    message?: string;
-    warning?: string;
-    currentPath?: string;
-    directiveName?: string;
-    argumentName?: string;
-    argumentValue?: string | number | boolean | null;
-    error?: string;
-}> {
+) {
+    const startTime = Date.now();
+
     // --- Input Validation ---
     const complexityError = validateInputComplexity(argumentValue, `directive argument "${argumentName}"`);
     if (complexityError) {
-        return { error: complexityError };
+        return createErrorResponse(complexityError, {
+            errorCode: ErrorCode.VALIDATION_ERROR,
+            sessionId,
+            path: currentPath,
+            suggestion: 'Reduce the complexity of the directive argument value'
+        });
     }
     // --- End Input Validation ---
 
     try {
         if (!GraphQLValidationUtils.isValidGraphQLName(directiveName.replace('@', ''))) {
-            return {
-                error: `Invalid directive name "${directiveName}".`
-            };
+            return createErrorResponse(
+                `Invalid directive name "${directiveName}".`,
+                {
+                    errorCode: ErrorCode.VALIDATION_ERROR,
+                    sessionId,
+                    path: currentPath,
+                    suggestion: 'Use a valid GraphQL name format for the directive'
+                }
+            );
         }
 
         // Load query state
         const queryState = await loadQueryState(sessionId);
         if (!queryState) {
-            return {
-                error: 'Session not found.'
-            };
+            return createErrorResponse('Session not found.', {
+                errorCode: ErrorCode.SESSION_NOT_FOUND,
+                sessionId,
+                path: currentPath,
+                suggestion: 'Start a new session with start-query-session'
+            });
         }
 
         try {
@@ -54,13 +64,29 @@ export async function setFieldDirective(
             const directive = schema.getDirective(directiveName);
 
             if (!directive) {
-                return { error: `Directive '@${directiveName}' not found in the schema.` };
+                return createErrorResponse(
+                    `Directive '@${directiveName}' not found in the schema.`,
+                    {
+                        errorCode: ErrorCode.DIRECTIVE_ERROR,
+                        sessionId,
+                        path: currentPath,
+                        suggestion: 'Verify the directive name using introspect-schema'
+                    }
+                );
             }
 
             if (argumentName) {
                 const argDef = directive.args.find(a => a.name === argumentName);
                 if (!argDef) {
-                    return { error: `Argument '${argumentName}' not found on directive '@${directiveName}'.` };
+                    return createErrorResponse(
+                        `Argument '${argumentName}' not found on directive '@${directiveName}'.`,
+                        {
+                            errorCode: ErrorCode.DIRECTIVE_ERROR,
+                            sessionId,
+                            path: currentPath,
+                            suggestion: 'Check the directive definition for available arguments'
+                        }
+                    );
                 }
 
                 if (typeof argumentValue === 'string' && argumentValue.startsWith('$')) {
@@ -68,27 +94,67 @@ export async function setFieldDirective(
                     const variableName = argumentValue;
                     const variableTypeStr = queryState.variablesSchema[variableName];
                     if (!variableTypeStr) {
-                        return { error: `Variable '${variableName}' is not defined.` };
+                        return createErrorResponse(
+                            `Variable '${variableName}' is not defined.`,
+                            {
+                                errorCode: ErrorCode.VALIDATION_ERROR,
+                                sessionId,
+                                path: currentPath,
+                                suggestion: 'Define the variable using declare-variable first'
+                            }
+                        );
                     }
                     const varTypeNode = parseType(variableTypeStr);
                     const varGqlType = typeFromAST(schema, varTypeNode as any);
                     if (!varGqlType) {
-                        return { error: `Could not determine type for variable '${variableName}'.` };
+                        return createErrorResponse(
+                            `Could not determine type for variable '${variableName}'.`,
+                            {
+                                errorCode: ErrorCode.VALIDATION_ERROR,
+                                sessionId,
+                                path: currentPath,
+                                suggestion: 'Verify the variable type is valid'
+                            }
+                        );
                     }
 
                     if (!isTypeSubTypeOf(schema, varGqlType, argDef.type)) {
-                        return { error: `Variable '${variableName}' of type '${variableTypeStr}' cannot be used for argument '${argumentName}' of type '${argDef.type.toString()}'.` };
+                        return createErrorResponse(
+                            `Variable '${variableName}' of type '${variableTypeStr}' cannot be used for argument '${argumentName}' of type '${argDef.type.toString()}'.`,
+                            {
+                                errorCode: ErrorCode.VALIDATION_ERROR,
+                                sessionId,
+                                path: currentPath,
+                                suggestion: 'Ensure the variable type matches the argument type'
+                            }
+                        );
                     }
                 } else if (argumentValue !== undefined) {
                     // It's a literal value
                     const validationError = GraphQLValidationUtils.validateValueAgainstType(argumentValue, argDef.type);
                     if (validationError) {
-                        return { error: `For argument '${argumentName}' on directive '@${directiveName}': ${validationError}` };
+                        return createErrorResponse(
+                            `For argument '${argumentName}' on directive '@${directiveName}': ${validationError}`,
+                            {
+                                errorCode: ErrorCode.VALIDATION_ERROR,
+                                sessionId,
+                                path: currentPath,
+                                suggestion: 'Ensure the argument value matches the expected type'
+                            }
+                        );
                     }
                 }
             }
         } catch (e: any) {
-            return { error: `Directive argument validation failed: ${e.message}` };
+            return createErrorResponse(
+                `Directive argument validation failed: ${e.message}`,
+                {
+                    errorCode: ErrorCode.INTERNAL_ERROR,
+                    sessionId,
+                    path: currentPath,
+                    suggestion: 'Verify the schema is accessible and valid'
+                }
+            );
         }
 
         // Navigate to field in query structure
@@ -97,9 +163,15 @@ export async function setFieldDirective(
             const pathParts = currentPath.split('.');
             for (const part of pathParts) {
                 if (!currentNode.fields || !currentNode.fields[part]) {
-                    return {
-                        error: `Field at path '${currentPath}' not found.`
-                    };
+                    return createErrorResponse(
+                        `Field at path '${currentPath}' not found.`,
+                        {
+                            errorCode: ErrorCode.FIELD_ERROR,
+                            sessionId,
+                            path: currentPath,
+                            suggestion: 'Verify the field exists using get-selections'
+                        }
+                    );
                 }
                 currentNode = currentNode.fields[part];
             }
@@ -151,19 +223,31 @@ export async function setFieldDirective(
             }
         }
 
-        return {
-            success: true,
-            message,
-            warning,
-            currentPath,
-            directiveName,
-            argumentName,
-            argumentValue
-        };
+        return createSuccessResponse(
+            {
+                message,
+                warning,
+                currentPath,
+                directiveName,
+                argumentName,
+                argumentValue
+            },
+            {
+                sessionId,
+                stateVersion: queryState.stateVersion,
+                executionTime: Date.now() - startTime
+            }
+        );
     } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : String(error)
-        };
+        return createErrorResponse(
+            error instanceof Error ? error.message : String(error),
+            {
+                errorCode: ErrorCode.INTERNAL_ERROR,
+                sessionId,
+                path: currentPath,
+                suggestion: 'Check the error message and verify all inputs are correct'
+            }
+        );
     }
 }
 
@@ -186,11 +270,7 @@ export const setFieldDirectiveTool = {
     }) => {
         const result = await setFieldDirective(sessionId, currentPath, directiveName, argumentName, argumentValue);
 
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        const { wrapToolResponse } = await import('./shared-utils.js');
+        return wrapToolResponse(result);
     }
 }; 

@@ -267,6 +267,53 @@ export const createSharedUtilsMock = (customMocks = {}) => ({
   generateSessionId: vi.fn().mockReturnValue('test-session-id'),
   fetchAndCacheSchema: vi.fn().mockResolvedValue(TEST_SCHEMA),
 
+  // Response helper functions - NEW for unified response format
+  createSuccessResponse: vi.fn().mockImplementation((data, options = {}) => ({
+    success: true,
+    data,
+    warnings: options.warnings,
+    metadata: {
+      sessionId: options.sessionId,
+      stateVersion: options.stateVersion,
+      executionTime: options.executionTime,
+      timestamp: new Date().toISOString()
+    }
+  })),
+  createErrorResponse: vi.fn().mockImplementation((error, options = {}) => ({
+    success: false,
+    error,
+    details: {
+      errorCode: options.errorCode,
+      suggestion: options.suggestion,
+      field: options.field,
+      path: options.path,
+      availableOptions: options.availableOptions
+    },
+    metadata: {
+      sessionId: options.sessionId,
+      timestamp: new Date().toISOString()
+    }
+  })),
+  wrapToolResponse: vi.fn().mockImplementation((response) => ({
+    content: [{
+      type: 'text',
+      text: JSON.stringify(response, null, 2)
+    }]
+  })),
+  ErrorCode: {
+    SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
+    VALIDATION_ERROR: 'VALIDATION_ERROR',
+    SCHEMA_ERROR: 'SCHEMA_ERROR',
+    REDIS_UNAVAILABLE: 'REDIS_UNAVAILABLE',
+    ARGUMENT_ERROR: 'ARGUMENT_ERROR',
+    FIELD_ERROR: 'FIELD_ERROR',
+    VARIABLE_ERROR: 'VARIABLE_ERROR',
+    FRAGMENT_ERROR: 'FRAGMENT_ERROR',
+    DIRECTIVE_ERROR: 'DIRECTIVE_ERROR',
+    EXECUTION_ERROR: 'EXECUTION_ERROR',
+    INTERNAL_ERROR: 'INTERNAL_ERROR'
+  },
+
   loadQueryState: vi.fn().mockImplementation(async (sessionId: string) => {
     if (sessionId === 'invalid-session-id' || sessionId === 'non-existent-session') {
       return null;

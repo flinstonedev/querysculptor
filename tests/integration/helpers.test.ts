@@ -33,9 +33,9 @@ describe('Helper Tools', () => {
     it('should get help for an input object', async () => {
         const { getInputObjectHelp } = await import('../../tools/get-input-object-help');
         const result = await getInputObjectHelp('UserInput');
-        expect(result.inputTypeName).toBe('UserInput');
-        expect(result.fields).toHaveLength(2);
-        expect(result.description).toContain('Input for user creation');
+        expect(result.data.inputTypeName).toBe('UserInput');
+        expect(result.data.fields).toHaveLength(2);
+        expect(result.data.description).toContain('Input for user creation');
     });
 });
 

@@ -51,6 +51,51 @@ vi.mock('../../tools/shared-utils', async () => {
                     || tryRoot(schema.getSubscriptionType());
             },
         },
+        createSuccessResponse: vi.fn().mockImplementation((data, options = {}) => ({
+            success: true,
+            data,
+            warnings: options.warnings,
+            metadata: {
+                sessionId: options.sessionId,
+                stateVersion: options.stateVersion,
+                executionTime: options.executionTime,
+                timestamp: new Date().toISOString()
+            }
+        })),
+        createErrorResponse: vi.fn().mockImplementation((error, options = {}) => ({
+            success: false,
+            error,
+            details: {
+                errorCode: options.errorCode,
+                suggestion: options.suggestion,
+                field: options.field,
+                path: options.path,
+                availableOptions: options.availableOptions
+            },
+            metadata: {
+                sessionId: options.sessionId,
+                timestamp: new Date().toISOString()
+            }
+        })),
+        wrapToolResponse: vi.fn().mockImplementation((response) => ({
+            content: [{
+                type: 'text',
+                text: JSON.stringify(response, null, 2)
+            }]
+        })),
+        ErrorCode: {
+            SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
+            VALIDATION_ERROR: 'VALIDATION_ERROR',
+            SCHEMA_ERROR: 'SCHEMA_ERROR',
+            REDIS_UNAVAILABLE: 'REDIS_UNAVAILABLE',
+            ARGUMENT_ERROR: 'ARGUMENT_ERROR',
+            FIELD_ERROR: 'FIELD_ERROR',
+            VARIABLE_ERROR: 'VARIABLE_ERROR',
+            FRAGMENT_ERROR: 'FRAGMENT_ERROR',
+            DIRECTIVE_ERROR: 'DIRECTIVE_ERROR',
+            EXECUTION_ERROR: 'EXECUTION_ERROR',
+            INTERNAL_ERROR: 'INTERNAL_ERROR'
+        },
     };
 });
 
@@ -108,25 +153,25 @@ describe('setInputObjectArgument', () => {
         it('should handle nested input objects correctly', async () => {
             const result = await setInputObjectArgument('test-session', 'updateUser', 'filter', 'origin.name', 'Earth');
             expect(result.success).toBe(true);
-            expect(result.message).toContain("Set 'origin.name' to '\"Earth\"' in input object 'filter'");
+            expect(result.data.message).toContain("Set 'origin.name' to '\"Earth\"' in input object 'filter'");
         });
 
         it('should set simple field values correctly', async () => {
             const result = await setInputObjectArgument('test-session', 'updateUser', 'input', 'name', 'John Doe');
             expect(result.success).toBe(true);
-            expect(result.message).toContain("Set 'name' to '\"John Doe\"' in input object 'input'");
+            expect(result.data.message).toContain("Set 'name' to '\"John Doe\"' in input object 'input'");
         });
 
         it('should set numeric field values correctly', async () => {
             const result = await setInputObjectArgument('test-session', 'updateUser', 'input', 'age', 25);
             expect(result.success).toBe(true);
-            expect(result.message).toContain("Set 'age' to '25' in input object 'input'");
+            expect(result.data.message).toContain("Set 'age' to '25' in input object 'input'");
         });
 
         it('should set boolean field values correctly', async () => {
             const result = await setInputObjectArgument('test-session', 'updateUser', 'input', 'active', true);
             expect(result.success).toBe(true);
-            expect(result.message).toContain("Set 'active' to 'true' in input object 'input'");
+            expect(result.data.message).toContain("Set 'active' to 'true' in input object 'input'");
         });
     });
 }); 

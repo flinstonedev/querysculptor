@@ -57,7 +57,7 @@ describe('Agent-Like Workflow Tests', () => {
 
             // Verify final query was generated
             const finalStep = result.steps[result.steps.length - 1];
-            expect(finalStep.response).toMatchObject({
+            expect(finalStep.response.data).toMatchObject({
                 queryString: expect.stringContaining('abilities')
             });
             expect(finalStep.response.error).toBeUndefined();
@@ -90,7 +90,7 @@ describe('Agent-Like Workflow Tests', () => {
             const sessionResponse = await agentClient.callTool('start-query-session');
             expect(sessionResponse.sessionId).toBeDefined();
             expect(sessionResponse.error).toBeUndefined();
-            
+
             const realSessionId = sessionResponse.sessionId;
             
             // Build query with real session
@@ -106,7 +106,7 @@ describe('Agent-Like Workflow Tests', () => {
                 sessionId: realSessionId
             });
             expect(queryResponse.error).toBeUndefined();
-            expect(queryResponse.queryString).toContain('pokemon');
+            expect(queryResponse.data.queryString).toContain('pokemon');
         });
 
         it('should properly handle invalid session IDs', async () => {
@@ -275,8 +275,8 @@ describe('Agent-Like Workflow Tests', () => {
                 sessionId
             });
             expect(finalQuery.error).toBeUndefined();
-            expect(finalQuery.queryString).toContain('abilities');
-            expect(finalQuery.queryString).toContain('results');
+            expect(finalQuery.data.queryString).toContain('abilities');
+            expect(finalQuery.data.queryString).toContain('results');
         }, 30000);
     });
 

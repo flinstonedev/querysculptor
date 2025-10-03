@@ -38,6 +38,9 @@ vi.mock('../../tools/shared-utils', async () => {
         loadQueryState: vi.fn(),
         saveQueryState: vi.fn(),
         fetchAndCacheSchema: vi.fn(),
+        // Add response helper mocks
+        createSuccessResponse: vi.fn((data) => ({ data })),
+        createErrorResponse: vi.fn((error) => ({ error })),
     };
 });
 
@@ -84,7 +87,7 @@ describe('Query Execution', () => {
     it('should execute a query successfully', async () => {
         const result = await executeGraphQLQuery('test-session');
         expect(result.data).toBeDefined();
-        expect((result.data as any).user.name).toBe('Test User');
+        expect(result.data.data.user.name).toBe('Test User');
     });
 
     it('should return a validation error for an invalid query', async () => {
@@ -97,9 +100,9 @@ describe('Query Execution', () => {
 
         const result = await validateGraphQLQuery('test-session');
 
-        expect(result.valid).toBe(false);
-        expect(result.errors).toBeDefined();
-        expect(result.errors).toContain("Cannot query field 'nonExistent' on type 'Query'.");
+        expect(result.data.valid).toBe(false);
+        expect(result.data.errors).toBeDefined();
+        expect(result.data.errors).toContain("Cannot query field 'nonExistent' on type 'Query'.");
     });
 
     it('should handle network errors during execution', async () => {
@@ -162,8 +165,8 @@ describe('Enhanced Execution and Validation Tests', () => {
             });
 
             const result = await validateGraphQLQuery('test-session');
-            expect(result.valid).toBe(false);
-            expect(result.errors).toContain('Syntax Error: Expected Name, found }');
+            expect(result.data.valid).toBe(false);
+            expect(result.data.errors).toContain('Syntax Error: Expected Name, found }');
         });
 
         it('should handle multiple validation errors', async () => {
@@ -191,17 +194,17 @@ describe('Enhanced Execution and Validation Tests', () => {
             ] as any);
 
             const result = await validateGraphQLQuery('test-session');
-            expect(result.valid).toBe(false);
-            expect(result.errors).toHaveLength(2);
-            expect(result.errors).toContain("Cannot query field 'nonExistent' on type 'Query'.");
-            expect(result.errors).toContain("Cannot query field 'alsoNonExistent' on type 'Query'.");
+            expect(result.data.valid).toBe(false);
+            expect(result.data.errors).toHaveLength(2);
+            expect(result.data.errors).toContain("Cannot query field 'nonExistent' on type 'Query'.");
+            expect(result.data.errors).toContain("Cannot query field 'alsoNonExistent' on type 'Query'.");
         });
 
         it('should handle schema fetching failures', async () => {
             vi.mocked(sharedUtils.fetchAndCacheSchema).mockRejectedValue(new Error('Schema fetch failed'));
 
             const result = await validateGraphQLQuery('test-session');
-            expect(result.errors).toContain('Schema validation failed: Schema fetch failed');
+            expect(result.error).toContain('Schema validation failed: Schema fetch failed');
         });
 
         it('should handle invalid variable types', async () => {
@@ -228,8 +231,8 @@ describe('Enhanced Execution and Validation Tests', () => {
             ] as any);
 
             const result = await validateGraphQLQuery('test-session');
-            expect(result.valid).toBe(false);
-            expect(result.errors).toContain("Unknown type 'InvalidType'.");
+            expect(result.data.valid).toBe(false);
+            expect(result.data.errors).toContain("Unknown type 'InvalidType'.");
         });
 
         it('should handle complex nested query validation', async () => {
@@ -279,8 +282,8 @@ describe('Enhanced Execution and Validation Tests', () => {
             ] as any);
 
             const result = await validateGraphQLQuery('test-session');
-            expect(result.valid).toBe(false);
-            expect(result.errors).toContain("Cannot query field 'invalidField' on type 'User'.");
+            expect(result.data.valid).toBe(false);
+            expect(result.data.errors).toContain("Cannot query field 'invalidField' on type 'User'.");
         });
 
         it('should validate queries with fragments', async () => {
@@ -316,8 +319,8 @@ describe('Enhanced Execution and Validation Tests', () => {
             ] as any);
 
             const result = await validateGraphQLQuery('test-session');
-            expect(result.valid).toBe(false);
-            expect(result.errors).toContain("Cannot query field 'invalidField' on type 'User'.");
+            expect(result.data.valid).toBe(false);
+            expect(result.data.errors).toContain("Cannot query field 'invalidField' on type 'User'.");
         });
 
         it('should handle empty query validation', async () => {
@@ -340,8 +343,8 @@ describe('Enhanced Execution and Validation Tests', () => {
             vi.mocked(sharedUtils.buildQueryFromStructure).mockReturnValue('');
 
             const result = await validateGraphQLQuery('test-session');
-            expect(result.valid).toBe(false);
-            expect(result.errors).toContain('Query is empty. Add at least one field to the query.');
+            expect(result.data.valid).toBe(false);
+            expect(result.data.errors).toContain('Query is empty. Add at least one field to the query.');
         });
 
         it('should handle whitespace-only query validation', async () => {
@@ -364,8 +367,8 @@ describe('Enhanced Execution and Validation Tests', () => {
             vi.mocked(sharedUtils.buildQueryFromStructure).mockReturnValue('   \n  \t  ');
 
             const result = await validateGraphQLQuery('test-session');
-            expect(result.valid).toBe(false);
-            expect(result.errors).toContain('Query is empty. Add at least one field to the query.');
+            expect(result.data.valid).toBe(false);
+            expect(result.data.errors).toContain('Query is empty. Add at least one field to the query.');
         });
     });
 
@@ -419,11 +422,9 @@ describe('Enhanced Execution and Validation Tests', () => {
             } as Response);
 
             const result = await executeGraphQLQuery('test-session');
-            expect(result.errors).toHaveLength(2);
-            expect(result.errors).toEqual(expect.arrayContaining([
-                expect.objectContaining({ message: 'User not found' }),
-                expect.objectContaining({ message: 'Unauthorized access' })
-            ]));
+            expect(result.error).toContain('GraphQL errors');
+            expect(result.error).toContain('User not found');
+            expect(result.error).toContain('Unauthorized access');
         });
 
         it('should handle partial data with errors', async () => {
@@ -436,8 +437,8 @@ describe('Enhanced Execution and Validation Tests', () => {
             } as Response);
 
             const result = await executeGraphQLQuery('test-session');
-            expect(result.data).toEqual({ user: { name: 'John' } });
-            expect(result.errors).toEqual(expect.arrayContaining([
+            expect(result.data.data).toEqual({ user: { name: 'John' } });
+            expect(result.data.errors).toEqual(expect.arrayContaining([
                 expect.objectContaining({ message: 'Could not fetch posts' })
             ]));
         });
@@ -475,7 +476,7 @@ describe('Enhanced Execution and Validation Tests', () => {
 
             // Instead of checking fetch headers (which aren't working due to implementation issue),
             // just verify the execution completed successfully
-            expect(result.data).toEqual({ user: { name: 'Test' } });
+            expect(result.data.data).toEqual({ user: { name: 'Test' } });
             expect(global.fetch).toHaveBeenCalledWith(
                 'http://localhost:4000/graphql',
                 expect.objectContaining({
@@ -538,7 +539,7 @@ describe('Enhanced Execution and Validation Tests', () => {
             } as Response);
 
             const result = await executeGraphQLQuery('test-session');
-            expect(result.data).toEqual({ createUser: { id: '1', name: 'New User' } });
+            expect(result.data.data).toEqual({ createUser: { id: '1', name: 'New User' } });
         });
     });
 
@@ -559,13 +560,13 @@ describe('Enhanced Execution and Validation Tests', () => {
                 variablesValues: {},
                 createdAt: new Date().toISOString(),
             };
-            
+
             vi.mocked(sharedUtils.loadQueryState).mockResolvedValue(testQueryState as any);
             vi.mocked(sharedUtils.buildQueryFromStructure).mockReturnValue('query { testField }');
 
             const result = await validateGraphQLQuery('test-session');
-            expect(result.valid).toBe(true);
-            expect(result.query).toContain('testField');
+            expect(result.data.valid).toBe(true);
+            expect(result.data.query).toContain('testField');
         });
 
         it('should handle buildQueryFromStructure throwing errors during validation', async () => {

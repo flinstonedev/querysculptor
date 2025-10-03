@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils, fetchAndCacheSchema } from "./shared-utils.js";
+import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils, fetchAndCacheSchema ,
+    createSuccessResponse,
+    createErrorResponse,
+    ErrorCode
+} from "./shared-utils.js";
 import { isTypeSubTypeOf, typeFromAST, getNamedType, isObjectType, isInterfaceType } from 'graphql';
 import { parseType } from 'graphql/language/parser.js';
 
@@ -9,41 +13,46 @@ export async function setVariableArgument(
     currentPath: string,
     argumentName: string,
     variableName: string
-): Promise<{
-    success?: boolean;
-    message?: string;
-    queryStructure?: any;
-    error?: string;
-}> {
+) {
+    const startTime = Date.now();
+
     try {
         // Validate argument name syntax
         if (!GraphQLValidationUtils.isValidGraphQLName(argumentName)) {
-            return {
-                error: `Invalid argument name "${argumentName}". Must match /^[_A-Za-z][_0-9A-Za-z]*$/`
-            };
+            return createErrorResponse(`Invalid argument name "${argumentName}". Must match /^[_A-Za-z][_0-9A-Za-z]*$/`, {
+                errorCode: ErrorCode.VALIDATION_ERROR,
+                sessionId,
+                suggestion: 'Use a valid GraphQL name for the argument'
+            });
         }
 
         // Validate variable name syntax
         const variableNameValidation = GraphQLValidationUtils.validateVariableName(variableName);
         if (!variableNameValidation.valid) {
-            return {
-                error: variableNameValidation.error
-            };
+            return createErrorResponse(variableNameValidation.error || 'Invalid variable name.', {
+                errorCode: ErrorCode.VALIDATION_ERROR,
+                sessionId,
+                suggestion: 'Variable name must start with $ and follow GraphQL naming rules (e.g., "$userId")'
+            });
         }
 
         // Load query state
         const queryState = await loadQueryState(sessionId);
         if (!queryState) {
-            return {
-                error: 'Session not found.'
-            };
+            return createErrorResponse('Session not found.', {
+                errorCode: ErrorCode.SESSION_NOT_FOUND,
+                sessionId,
+                suggestion: 'Start a new session with start-query-session'
+            });
         }
 
         // Legacy validation for backward compatibility
         if (!variableName.startsWith('$')) {
-            return {
-                error: `Variable name must start with '$'. Provided: '${variableName}'.`
-            };
+            return createErrorResponse(`Variable name must start with '$'. Provided: '${variableName}'.`, {
+                errorCode: ErrorCode.VALIDATION_ERROR,
+                sessionId,
+                suggestion: 'Add $ prefix to the variable name (e.g., "$userId")'
+            });
         }
 
         // Navigate to field in query structure
@@ -52,9 +61,11 @@ export async function setVariableArgument(
             const pathParts = currentPath.split('.');
             for (const part of pathParts) {
                 if (!currentNode.fields || !currentNode.fields[part]) {
-                    return {
-                        error: `Field at path '${currentPath}' not found.`
-                    };
+                    return createErrorResponse(`Field at path '${currentPath}' not found.`, {
+                        errorCode: ErrorCode.VALIDATION_ERROR,
+                        sessionId,
+                        suggestion: 'Check that the field path is correct and fields have been added'
+                    });
                 }
                 currentNode = currentNode.fields[part];
             }
@@ -66,25 +77,45 @@ export async function setVariableArgument(
 
             const argType = GraphQLValidationUtils.getArgumentType(schema, currentPath, argumentName);
             if (!argType) {
-                return { error: `Argument '${argumentName}' not found on field '${currentPath}'.` };
+                return createErrorResponse(`Argument '${argumentName}' not found on field '${currentPath}'.`, {
+                    errorCode: ErrorCode.VALIDATION_ERROR,
+                    sessionId,
+                    suggestion: 'Use introspect-schema to see available arguments for this field'
+                });
             }
 
             // Ensure variable exists and its type is compatible
             const variableTypeStr = queryState.variablesSchema[variableName];
             if (!variableTypeStr) {
-                return { error: `Variable '${variableName}' is not defined. Use set-query-variable first.` };
+                return createErrorResponse(`Variable '${variableName}' is not defined. Use set-query-variable first.`, {
+                    errorCode: ErrorCode.VARIABLE_ERROR,
+                    sessionId,
+                    suggestion: 'Define the variable using set-query-variable before using it in arguments'
+                });
             }
             const varTypeNode = parseType(variableTypeStr);
             const varGqlType = typeFromAST(schema, varTypeNode as any);
             if (!varGqlType) {
-                return { error: `Could not determine type for variable '${variableName}'.` };
+                return createErrorResponse(`Could not determine type for variable '${variableName}'.`, {
+                    errorCode: ErrorCode.VARIABLE_ERROR,
+                    sessionId,
+                    suggestion: 'Check that the variable type is valid'
+                });
             }
 
             if (!isTypeSubTypeOf(schema, varGqlType, argType as any)) {
-                return { error: `Variable '${variableName}' of type '${variableTypeStr}' cannot be used for argument '${argumentName}' of type '${argType.toString()}'.` };
+                return createErrorResponse(`Variable '${variableName}' of type '${variableTypeStr}' cannot be used for argument '${argumentName}' of type '${argType.toString()}'.`, {
+                    errorCode: ErrorCode.VARIABLE_ERROR,
+                    sessionId,
+                    suggestion: 'Ensure the variable type is compatible with the argument type'
+                });
             }
         } catch (e: any) {
-            return { error: `Schema validation failed: ${e.message}` };
+            return createErrorResponse(`Schema validation failed: ${e.message}`, {
+                errorCode: ErrorCode.VALIDATION_ERROR,
+                sessionId,
+                suggestion: 'Check that the field and argument exist in the schema'
+            });
         }
 
         // Set the argument value
@@ -96,15 +127,23 @@ export async function setVariableArgument(
         // Save updated query state
         await saveQueryState(sessionId, queryState);
 
-        return {
-            success: true,
-            message: `Variable argument '${argumentName}' set to ${variableName} at path '${currentPath}'.`,
-            queryStructure: queryState.queryStructure
-        };
+        return createSuccessResponse(
+            {
+                message: `Variable argument '${argumentName}' set to ${variableName} at path '${currentPath}'.`,
+                queryStructure: queryState.queryStructure
+            },
+            {
+                sessionId,
+                stateVersion: queryState.stateVersion,
+                executionTime: Date.now() - startTime
+            }
+        );
     } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : String(error)
-        };
+        return createErrorResponse(error instanceof Error ? error.message : String(error), {
+            errorCode: ErrorCode.INTERNAL_ERROR,
+            sessionId,
+            suggestion: 'Check the error message for details'
+        });
     }
 }
 
@@ -125,11 +164,7 @@ export const setVariableArgumentTool = {
     }) => {
         const result = await setVariableArgument(sessionId, currentPath, argumentName, variableName);
 
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        const { wrapToolResponse } = await import('./shared-utils.js');
+        return wrapToolResponse(result);
     }
 }; 

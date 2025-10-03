@@ -37,8 +37,8 @@ describe('Session Management', () => {
 
         const result = await endQuerySession(mockSessionId);
 
-        expect(result.sessionInfo?.sessionId).toBe(mockSessionId);
-        expect(result.message).toContain('ended successfully');
+        expect(result.data.sessionInfo?.sessionId).toBe(mockSessionId);
+        expect(result.data.message).toContain('ended successfully');
         expect(sharedUtils.deleteQueryState).toHaveBeenCalledWith(mockSessionId);
     });
 
@@ -76,10 +76,10 @@ describe('Get Current Query', () => {
 
         const result = await getCurrentQuery('test-session-id');
 
-        expect(result.queryString).toBeDefined();
-        expect(result.queryString).toContain('query GetUser($userId: ID!)');
-        expect(result.queryString).toContain('user(id: $userId)');
-        expect(result.variables_schema).toEqual({ '$userId': 'ID!' });
+        expect(result.data.queryString).toBeDefined();
+        expect(result.data.queryString).toContain('query GetUser($userId: ID!)');
+        expect(result.data.queryString).toContain('user(id: $userId)');
+        expect(result.data.variables_schema).toEqual({ '$userId': 'ID!' });
         expect(result.error).toBeUndefined();
         expect(sharedUtils.buildQueryFromStructure).toHaveBeenCalledWith(
             mockQueryState.queryStructure,
@@ -115,9 +115,9 @@ describe('Get Current Query', () => {
 
         const result = await getCurrentQuery('test-session-id');
 
-        expect(result.queryString).toBeDefined();
-        expect(result.queryString).toContain('users');
-        expect(result.variables_schema).toEqual({});
+        expect(result.data.queryString).toBeDefined();
+        expect(result.data.queryString).toContain('users');
+        expect(result.data.variables_schema).toEqual({});
         expect(result.error).toBeUndefined();
     });
 
@@ -144,9 +144,9 @@ describe('Get Current Query', () => {
 
         const result = await getCurrentQuery('test-session-id');
 
-        expect(result.queryString).toBeDefined();
-        expect(result.queryString).toContain('...userFields');
-        expect(result.queryString).toContain('fragment userFields');
+        expect(result.data.queryString).toBeDefined();
+        expect(result.data.queryString).toContain('...userFields');
+        expect(result.data.queryString).toContain('fragment userFields');
         expect(result.error).toBeUndefined();
     });
 
@@ -163,8 +163,8 @@ describe('Get Current Query', () => {
 
         const result = await getCurrentQuery('test-session-id');
 
-        expect(result.queryString).toBeDefined();
-        expect(result.queryString).toContain('@live');
+        expect(result.data.queryString).toBeDefined();
+        expect(result.data.queryString).toContain('@live');
         expect(result.error).toBeUndefined();
     });
 
@@ -173,9 +173,8 @@ describe('Get Current Query', () => {
 
         const result = await getCurrentQuery('non-existent-session');
 
-        expect(result.error).toBe('Session not found.');
-        expect(result.queryString).toBeUndefined();
-        expect(result.variables_schema).toBeUndefined();
+        expect(result.error).toBe('Session not found');
+        expect(result.data).toBeUndefined();
     });
 
     it('should handle errors from buildQueryFromStructure', async () => {
@@ -187,8 +186,7 @@ describe('Get Current Query', () => {
         const result = await getCurrentQuery('test-session-id');
 
         expect(result.error).toBe('Failed to build query');
-        expect(result.queryString).toBeUndefined();
-        expect(result.variables_schema).toBeUndefined();
+        expect(result.data).toBeUndefined();
     });
 });
 
@@ -204,6 +202,6 @@ describe('Session Management - Error Handling', () => {
         vi.mocked(sharedUtils.loadQueryState).mockResolvedValue(null);
         const { endQuerySession } = await import('../../tools/end-query-session');
         const result = await endQuerySession('non-existent-session');
-        expect(result.error).toBe('Session not found.');
+        expect(result.error).toBe('Session not found');
     });
 }); 

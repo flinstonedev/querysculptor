@@ -91,8 +91,8 @@ describe('GraphQL API Integration Tests', () => {
             const queryResult = await getCurrentQueryTool.handler({ sessionId });
             const queryResponse = JSON.parse(queryResult.content[0].text);
 
-            expect(queryResponse.queryString).toContain('characters');
-            expect(queryResponse.queryString).toContain('query IntegrationTest');
+            expect(queryResponse.data.queryString).toContain('characters');
+            expect(queryResponse.data.queryString).toContain('query IntegrationTest');
         });
 
         it('should handle arguments correctly', async () => {
@@ -113,7 +113,7 @@ describe('GraphQL API Integration Tests', () => {
             const queryResult = await getCurrentQueryTool.handler({ sessionId });
             const queryResponse = JSON.parse(queryResult.content[0].text);
 
-            expect(queryResponse.queryString).toContain('characters(page: 1)');
+            expect(queryResponse.data.queryString).toContain('characters(page: 1)');
         });
     });
 }); 

@@ -5,7 +5,10 @@ import {
     saveQueryState,
     GraphQLValidationUtils,
     fetchAndCacheSchema,
-    validateInputComplexity
+    validateInputComplexity,
+    createSuccessResponse,
+    createErrorResponse,
+    ErrorCode
 } from "./shared-utils.js";
 import { typeFromAST, GraphQLType } from "graphql";
 import { parseType } from "graphql/language/parser.js";
@@ -16,35 +19,39 @@ export async function setQueryVariable(
     variableName: string,
     variableType: string,
     defaultValue?: string | number | boolean | null
-): Promise<{
-    success?: boolean;
-    message?: string;
-    variablesSchema?: { [key: string]: string };
-    variablesDefaults?: { [key: string]: any };
-    error?: string;
-}> {
+) {
+    const startTime = Date.now();
+
     try {
         // --- Input Validation ---
         const complexityError = validateInputComplexity(defaultValue, `default value for variable "${variableName}"`);
         if (complexityError) {
-            return { error: complexityError };
+            return createErrorResponse(complexityError, {
+                errorCode: ErrorCode.VALIDATION_ERROR,
+                sessionId,
+                suggestion: 'Reduce the complexity of the default value'
+            });
         }
         // --- End Input Validation ---
 
         // Validate variable name
         const variableValidation = GraphQLValidationUtils.validateVariableName(variableName);
         if (!variableValidation.valid) {
-            return {
-                error: variableValidation.error || 'Invalid variable name.'
-            };
+            return createErrorResponse(variableValidation.error || 'Invalid variable name.', {
+                errorCode: ErrorCode.VALIDATION_ERROR,
+                sessionId,
+                suggestion: 'Variable name must start with $ and follow GraphQL naming rules (e.g., "$userId")'
+            });
         }
 
         // Validate variable type syntax
         const typeValidation = GraphQLValidationUtils.validateVariableType(variableType);
         if (!typeValidation.valid) {
-            return {
-                error: typeValidation.error || 'Invalid variable type.'
-            };
+            return createErrorResponse(typeValidation.error || 'Invalid variable type.', {
+                errorCode: ErrorCode.VALIDATION_ERROR,
+                sessionId,
+                suggestion: 'Use valid GraphQL type syntax (e.g., "ID!", "String", "[Int]")'
+            });
         }
 
         // Validate variable type exists in schema
@@ -55,30 +62,38 @@ export async function setQueryVariable(
                 const gqlType = typeFromAST(schema, typeNode as any);
 
                 if (!gqlType) {
-                    return {
-                        error: `Type '${variableType}' does not exist in the GraphQL schema.`
-                    };
+                    return createErrorResponse(`Type '${variableType}' does not exist in the GraphQL schema.`, {
+                        errorCode: ErrorCode.VALIDATION_ERROR,
+                        sessionId,
+                        suggestion: 'Use introspect-schema to see available types'
+                    });
                 }
             } catch (parseError: any) {
-                return {
-                    error: `Invalid variable type syntax: ${parseError.message}`
-                };
+                return createErrorResponse(`Invalid variable type syntax: ${parseError.message}`, {
+                    errorCode: ErrorCode.VALIDATION_ERROR,
+                    sessionId,
+                    suggestion: 'Check the GraphQL type syntax'
+                });
             }
         }
 
         // Load query state
         const queryState = await loadQueryState(sessionId);
         if (!queryState) {
-            return {
-                error: 'Session not found.'
-            };
+            return createErrorResponse('Session not found.', {
+                errorCode: ErrorCode.SESSION_NOT_FOUND,
+                sessionId,
+                suggestion: 'Start a new session with start-query-session'
+            });
         }
 
         // Legacy validation for backward compatibility
         if (!variableName.startsWith('$')) {
-            return {
-                error: `Variable name must start with '$'. Provided: '${variableName}'.`
-            };
+            return createErrorResponse(`Variable name must start with '$'. Provided: '${variableName}'.`, {
+                errorCode: ErrorCode.VALIDATION_ERROR,
+                sessionId,
+                suggestion: 'Add $ prefix to the variable name (e.g., "$userId")'
+            });
         }
 
         // Update variables schema
@@ -92,7 +107,11 @@ export async function setQueryVariable(
                 const gqlType = typeFromAST(schema, typeNode as any);
 
                 if (!gqlType) {
-                    return { error: `Could not determine GraphQL type for '${variableType}'.` };
+                    return createErrorResponse(`Could not determine GraphQL type for '${variableType}'.`, {
+                        errorCode: ErrorCode.VARIABLE_ERROR,
+                        sessionId,
+                        suggestion: 'Use a valid GraphQL type'
+                    });
                 }
 
                 // Apply coercion for string values
@@ -106,28 +125,44 @@ export async function setQueryVariable(
 
                 const validationError = GraphQLValidationUtils.validateValueAgainstType(processedValue, gqlType);
                 if (validationError) {
-                    return { error: `For default value of variable '${variableName}': ${validationError}` };
+                    return createErrorResponse(`For default value of variable '${variableName}': ${validationError}`, {
+                        errorCode: ErrorCode.VARIABLE_ERROR,
+                        sessionId,
+                        suggestion: 'Ensure the default value matches the variable type'
+                    });
                 }
 
                 queryState.variablesDefaults[variableName] = processedValue;
             } catch (e: any) {
-                return { error: `Type validation for default value failed: ${e.message}` };
+                return createErrorResponse(`Type validation for default value failed: ${e.message}`, {
+                    errorCode: ErrorCode.VARIABLE_ERROR,
+                    sessionId,
+                    suggestion: 'Check that the default value is valid for the specified type'
+                });
             }
         }
 
         // Save the updated query state
         await saveQueryState(sessionId, queryState);
 
-        return {
-            success: true,
-            message: `Variable '${variableName}' set to type '${variableType}'${defaultValue !== undefined ? ` with default value ${JSON.stringify(defaultValue)}` : ''}.`,
-            variablesSchema: queryState.variablesSchema,
-            variablesDefaults: queryState.variablesDefaults
-        };
+        return createSuccessResponse(
+            {
+                message: `Variable '${variableName}' set to type '${variableType}'${defaultValue !== undefined ? ` with default value ${JSON.stringify(defaultValue)}` : ''}.`,
+                variablesSchema: queryState.variablesSchema,
+                variablesDefaults: queryState.variablesDefaults
+            },
+            {
+                sessionId,
+                stateVersion: queryState.stateVersion,
+                executionTime: Date.now() - startTime
+            }
+        );
     } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : String(error)
-        };
+        return createErrorResponse(error instanceof Error ? error.message : String(error), {
+            errorCode: ErrorCode.INTERNAL_ERROR,
+            sessionId,
+            suggestion: 'Check the error message for details'
+        });
     }
 }
 
@@ -148,11 +183,7 @@ export const setQueryVariableTool = {
     }) => {
         const result = await setQueryVariable(sessionId, variableName, variableType, defaultValue);
 
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        const { wrapToolResponse } = await import('./shared-utils.js');
+        return wrapToolResponse(result);
     }
 }; 

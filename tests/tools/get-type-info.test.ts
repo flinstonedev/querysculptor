@@ -12,6 +12,51 @@ vi.mock('../../tools/shared-utils.js', () => ({
     getTypeNameStr: (gqlType: any) => {
         if (gqlType && gqlType.name) return gqlType.name;
         return String(gqlType);
+    },
+    createSuccessResponse: vi.fn((data, options) => ({
+        success: true,
+        data,
+        warnings: options?.warnings,
+        metadata: {
+            sessionId: options?.sessionId,
+            stateVersion: options?.stateVersion,
+            executionTime: options?.executionTime,
+            timestamp: new Date().toISOString()
+        }
+    })),
+    createErrorResponse: vi.fn((error, options) => ({
+        success: false,
+        error: typeof error === 'string' ? error : error.message,
+        details: {
+            errorCode: options?.errorCode,
+            suggestion: options?.suggestion,
+            field: options?.field,
+            path: options?.path,
+            availableOptions: options?.availableOptions
+        },
+        metadata: {
+            sessionId: options?.sessionId,
+            timestamp: new Date().toISOString()
+        }
+    })),
+    wrapToolResponse: vi.fn((response) => ({
+        content: [{
+            type: 'text',
+            text: JSON.stringify(response, null, 2)
+        }]
+    })),
+    ErrorCode: {
+        SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
+        VALIDATION_ERROR: 'VALIDATION_ERROR',
+        SCHEMA_ERROR: 'SCHEMA_ERROR',
+        REDIS_UNAVAILABLE: 'REDIS_UNAVAILABLE',
+        ARGUMENT_ERROR: 'ARGUMENT_ERROR',
+        FIELD_ERROR: 'FIELD_ERROR',
+        VARIABLE_ERROR: 'VARIABLE_ERROR',
+        FRAGMENT_ERROR: 'FRAGMENT_ERROR',
+        DIRECTIVE_ERROR: 'DIRECTIVE_ERROR',
+        EXECUTION_ERROR: 'EXECUTION_ERROR',
+        INTERNAL_ERROR: 'INTERNAL_ERROR'
     }
 }));
 
@@ -26,18 +71,18 @@ describe('get-type-info CRITICAL Bug Fix', () => {
             expect(result.error).not.toBe('Cannot convert object to primitive value');
 
             // ASSERTION: Should return valid type information structure
-            expect(result.name).toBe('User');
-            expect(result.kind).toBeDefined();
-            expect(result.description).toBeDefined();
-            expect(result.fields).toBeDefined();
-            expect(Array.isArray(result.fields)).toBe(true);
+            expect(result.data.name).toBe('User');
+            expect(result.data.kind).toBeDefined();
+            expect(result.data.description).toBeDefined();
+            expect(result.data.fields).toBeDefined();
+            expect(Array.isArray(result.data.fields)).toBe(true);
         });
 
         it('should return proper field information for object types', async () => {
             const result = await getTypeInfo('User');
 
-            expect(result.fields).toBeDefined();
-            const fields = result.fields!;
+            expect(result.data.fields).toBeDefined();
+            const fields = result.data.fields!;
 
             // Should have expected User fields from TEST_SCHEMA
             const fieldNames = fields.map(f => f.name);
@@ -64,8 +109,8 @@ describe('get-type-info CRITICAL Bug Fix', () => {
 
                 // Should not have serialization errors
                 expect(result.error).toBeUndefined();
-                expect(result.name).toBe(typeName);
-                expect(result.fields).toBeDefined();
+                expect(result.data.name).toBe(typeName);
+                expect(result.data.fields).toBeDefined();
             }
         });
 
@@ -73,11 +118,11 @@ describe('get-type-info CRITICAL Bug Fix', () => {
             const result = await getTypeInfo('TestEnum');
 
             expect(result.error).toBeUndefined();
-            expect(result.name).toBe('TestEnum');
-            expect(result.enum_values).toBeDefined();
-            expect(Array.isArray(result.enum_values)).toBe(true);
+            expect(result.data.name).toBe('TestEnum');
+            expect(result.data.enum_values).toBeDefined();
+            expect(Array.isArray(result.data.enum_values)).toBe(true);
 
-            const enumValues = result.enum_values!;
+            const enumValues = result.data.enum_values!;
             const valueNames = enumValues.map(v => v.name);
             expect(valueNames).toContain('OPTION_A');
             expect(valueNames).toContain('OPTION_B');
@@ -88,11 +133,11 @@ describe('get-type-info CRITICAL Bug Fix', () => {
             const result = await getTypeInfo('UserInput');
 
             expect(result.error).toBeUndefined();
-            expect(result.name).toBe('UserInput');
-            expect(result.input_fields).toBeDefined();
-            expect(Array.isArray(result.input_fields)).toBe(true);
+            expect(result.data.name).toBe('UserInput');
+            expect(result.data.input_fields).toBeDefined();
+            expect(Array.isArray(result.data.input_fields)).toBe(true);
 
-            const inputFields = result.input_fields!;
+            const inputFields = result.data.input_fields!;
             const fieldNames = inputFields.map(f => f.name);
             expect(fieldNames).toContain('name');
             expect(fieldNames).toContain('email');
@@ -104,18 +149,17 @@ describe('get-type-info CRITICAL Bug Fix', () => {
 
             expect(result.error).toBeDefined();
             expect(result.error).toContain('Type \'NonExistentType\' not found in schema');
-            expect(result.name).toBeUndefined();
-            expect(result.fields).toBeUndefined();
+            expect(result.data).toBeUndefined();
         });
 
         it('should handle complex field arguments correctly', async () => {
             const result = await getTypeInfo('Query');
 
             expect(result.error).toBeUndefined();
-            expect(result.fields).toBeDefined();
+            expect(result.data.fields).toBeDefined();
 
             // Find the complexField to test argument handling
-            const complexField = result.fields!.find(f => f.name === 'complexField');
+            const complexField = result.data.fields!.find(f => f.name === 'complexField');
             expect(complexField).toBeDefined();
             expect(complexField.args).toBeDefined();
             expect(Array.isArray(complexField.args)).toBe(true);
@@ -135,11 +179,11 @@ describe('get-type-info CRITICAL Bug Fix', () => {
             const result = await getTypeInfo('User');
 
             expect(result.error).toBeUndefined();
-            expect(result.name).toBe('User');
+            expect(result.data.name).toBe('User');
 
             // All field descriptions should be strings or null
-            if (result.fields) {
-                result.fields.forEach(field => {
+            if (result.data.fields) {
+                result.data.fields.forEach(field => {
                     expect(typeof field.description === 'string' || field.description === null).toBe(true);
                     field.args.forEach((arg: any) => {
                         expect(typeof arg.description === 'string' || arg.description === null).toBe(true);

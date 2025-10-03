@@ -1,27 +1,31 @@
 import { z } from "zod";
-import { QueryState, loadQueryState, resolveEndpointAndHeaders, buildQueryFromStructure, analyzeQueryComplexity, executeWithTimeout, QUERY_EXECUTION_TIMEOUT, MAX_QUERY_COMPLEXITY } from "./shared-utils.js";
+import {
+    QueryState,
+    loadQueryState,
+    resolveEndpointAndHeaders,
+    buildQueryFromStructure,
+    analyzeQueryComplexity,
+    executeWithTimeout,
+    QUERY_EXECUTION_TIMEOUT,
+    MAX_QUERY_COMPLEXITY,
+    createSuccessResponse,
+    createErrorResponse,
+    ErrorCode
+} from "./shared-utils.js";
 
 // Core business logic - testable function
-export async function executeGraphQLQuery(sessionId: string): Promise<{
-    data?: any;
-    errors?: any[];
-    error?: string;
-    queryString?: string;
-    executionTime?: number;
-    complexityAnalysis?: {
-        depth: number;
-        fieldCount: number;
-        complexityScore: number;
-        warnings: string[];
-    };
-}> {
+export async function executeGraphQLQuery(sessionId: string) {
     const startTime = Date.now();
 
     try {
         // Load the query state
         const queryState = await loadQueryState(sessionId);
         if (!queryState) {
-            return { error: 'Session not found' };
+            return createErrorResponse('Session not found', {
+                errorCode: ErrorCode.SESSION_NOT_FOUND,
+                sessionId,
+                suggestion: 'Start a new session with start-query-session'
+            });
         }
 
         // Build the query string
@@ -37,11 +41,15 @@ export async function executeGraphQLQuery(sessionId: string): Promise<{
                 queryState.variablesDefaults || {}
             );
         } catch (buildError: any) {
-            return { error: `Failed to build query: ${buildError.message}` };
+            return createErrorResponse(`Failed to build query: ${buildError.message}`, {
+                errorCode: ErrorCode.VALIDATION_ERROR,
+                sessionId
+            });
         }
 
         // Perform complexity analysis (but don't fail for backward compatibility)
         let complexityAnalysis;
+        const warnings: string[] = [];
         try {
             const analysis = analyzeQueryComplexity(queryState.queryStructure, queryState.operationType);
 
@@ -52,12 +60,20 @@ export async function executeGraphQLQuery(sessionId: string): Promise<{
                 warnings: analysis.warnings
             };
 
+            if (analysis.warnings.length > 0) {
+                warnings.push(...analysis.warnings);
+            }
+
             // Only fail if complexity is critically high
             if (!analysis.valid && analysis.complexityScore > MAX_QUERY_COMPLEXITY.TOTAL_COMPLEXITY_SCORE) {
-                return {
-                    error: `Query complexity too high: ${analysis.errors.join('; ')}`,
-                    complexityAnalysis
-                };
+                return createErrorResponse(
+                    `Query complexity too high: ${analysis.errors.join('; ')}`,
+                    {
+                        errorCode: ErrorCode.VALIDATION_ERROR,
+                        sessionId,
+                        details: { complexityAnalysis }
+                    }
+                );
             }
         } catch (complexityError: any) {
             // Don't fail on complexity analysis errors for backward compatibility
@@ -74,12 +90,12 @@ export async function executeGraphQLQuery(sessionId: string): Promise<{
         const headers = { ...envHeaders, ...queryState.headers };
 
         if (!url) {
-            return {
-                error: 'No GraphQL endpoint configured',
-                queryString,
-                executionTime: Date.now() - startTime,
-                complexityAnalysis
-            };
+            return createErrorResponse('No GraphQL endpoint configured', {
+                errorCode: ErrorCode.EXECUTION_ERROR,
+                sessionId,
+                suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT in your .env file',
+                details: { queryString, complexityAnalysis }
+            });
         }
 
         // Prepare request body
@@ -104,12 +120,14 @@ export async function executeGraphQLQuery(sessionId: string): Promise<{
             );
 
             if (!response.ok) {
-                return {
-                    error: `HTTP ${response.status}: ${response.statusText}`,
-                    queryString,
-                    executionTime: Date.now() - startTime,
-                    complexityAnalysis
-                };
+                return createErrorResponse(
+                    `HTTP ${response.status}: ${response.statusText}`,
+                    {
+                        errorCode: ErrorCode.EXECUTION_ERROR,
+                        sessionId,
+                        details: { queryString, complexityAnalysis }
+                    }
+                );
             }
 
             // Parse JSON response with timeout
@@ -122,30 +140,56 @@ export async function executeGraphQLQuery(sessionId: string): Promise<{
 
             const executionTime = Date.now() - startTime;
 
-            return {
-                data: result.data,
-                errors: result.errors,
-                queryString,
-                executionTime,
-                complexityAnalysis
-            };
+            // GraphQL can return errors alongside data
+            if (result.errors && !result.data) {
+                return createErrorResponse(
+                    `GraphQL errors: ${result.errors.map((e: any) => e.message).join('; ')}`,
+                    {
+                        errorCode: ErrorCode.EXECUTION_ERROR,
+                        sessionId,
+                        details: {
+                            queryString,
+                            graphqlErrors: result.errors,
+                            complexityAnalysis
+                        }
+                    }
+                );
+            }
+
+            return createSuccessResponse(
+                {
+                    data: result.data,
+                    errors: result.errors,
+                    queryString,
+                    complexityAnalysis
+                },
+                {
+                    warnings: warnings.length > 0 ? warnings : undefined,
+                    sessionId,
+                    stateVersion: queryState.stateVersion,
+                    executionTime
+                }
+            );
 
         } catch (error: any) {
-            const executionTime = Date.now() - startTime;
-            return {
-                error: error.message,
-                queryString,
-                executionTime,
-                complexityAnalysis
-            };
+            return createErrorResponse(
+                error.message,
+                {
+                    errorCode: ErrorCode.EXECUTION_ERROR,
+                    sessionId,
+                    details: { queryString, complexityAnalysis }
+                }
+            );
         }
 
     } catch (error: any) {
-        const executionTime = Date.now() - startTime;
-        return {
-            error: `Execution failed: ${error.message}`,
-            executionTime
-        };
+        return createErrorResponse(
+            `Execution failed: ${error.message}`,
+            {
+                errorCode: ErrorCode.INTERNAL_ERROR,
+                sessionId
+            }
+        );
     }
 }
 
@@ -158,11 +202,7 @@ export const executeQueryTool = {
     handler: async ({ sessionId }: { sessionId: string }) => {
         const result = await executeGraphQLQuery(sessionId);
 
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        const { wrapToolResponse } = await import('./shared-utils.js');
+        return wrapToolResponse(result);
     }
 }; 

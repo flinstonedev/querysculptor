@@ -77,8 +77,8 @@ describe('Basic Integration Tests', () => {
         const queryResult = await getCurrentQueryTool.handler({ sessionId });
         const queryResponse = JSON.parse(queryResult.content[0].text);
 
-        expect(queryResponse.queryString).toContain('characters');
-        expect(queryResponse.queryString).toContain('query BasicTest');
+        expect(queryResponse.data.queryString).toContain('characters');
+        expect(queryResponse.data.queryString).toContain('query BasicTest');
     });
 
     it('should handle basic argument setting', async () => {
@@ -99,6 +99,6 @@ describe('Basic Integration Tests', () => {
         const queryResult = await getCurrentQueryTool.handler({ sessionId });
         const queryResponse = JSON.parse(queryResult.content[0].text);
 
-        expect(queryResponse.queryString).toContain('characters(page: 1)');
+        expect(queryResponse.data.queryString).toContain('characters(page: 1)');
     });
 }); 

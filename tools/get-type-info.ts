@@ -6,7 +6,14 @@ import {
     isEnumType,
     isInputObjectType
 } from 'graphql';
-import { resolveEndpointAndHeaders, fetchAndCacheSchema, getTypeNameStr } from "./shared-utils.js";
+import {
+    resolveEndpointAndHeaders,
+    fetchAndCacheSchema,
+    getTypeNameStr,
+    createSuccessResponse,
+    createErrorResponse,
+    ErrorCode
+} from "./shared-utils.js";
 
 // Helper function to safely convert values to strings
 function safeStringify(value: any): string {
@@ -62,21 +69,18 @@ function safeGetDescription(obj: any): string | null {
 }
 
 // Core business logic - testable function
-export async function getTypeInfo(typeName: string): Promise<{
-    name?: string;
-    kind?: string;
-    description?: string;
-    fields?: any[];
-    enum_values?: any[];
-    input_fields?: any[];
-    error?: string;
-}> {
+export async function getTypeInfo(typeName: string) {
+    const startTime = Date.now();
     const { url: resolvedUrl, headers } = resolveEndpointAndHeaders();
 
     if (!resolvedUrl) {
-        return {
-            error: "No default GraphQL endpoint configured in environment variables (DEFAULT_GRAPHQL_ENDPOINT)"
-        };
+        return createErrorResponse(
+            "No default GraphQL endpoint configured in environment variables (DEFAULT_GRAPHQL_ENDPOINT)",
+            {
+                errorCode: ErrorCode.SCHEMA_ERROR,
+                suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT in your .env file'
+            }
+        );
     }
 
     try {
@@ -84,9 +88,13 @@ export async function getTypeInfo(typeName: string): Promise<{
         const gqlType = schema.getType(typeName);
 
         if (!gqlType) {
-            return {
-                error: `Type '${typeName}' not found in schema`
-            };
+            return createErrorResponse(
+                `Type '${typeName}' not found in schema`,
+                {
+                    errorCode: ErrorCode.SCHEMA_ERROR,
+                    suggestion: 'Use get-root-ops to see available types'
+                }
+            );
         }
 
         const outputData: any = {
@@ -124,11 +132,16 @@ export async function getTypeInfo(typeName: string): Promise<{
             }));
         }
 
-        return outputData;
+        return createSuccessResponse(outputData, {
+            executionTime: Date.now() - startTime
+        });
     } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : String(error)
-        };
+        return createErrorResponse(
+            error instanceof Error ? error.message : String(error),
+            {
+                errorCode: ErrorCode.SCHEMA_ERROR
+            }
+        );
     }
 }
 
@@ -140,12 +153,7 @@ export const getTypeInfoTool = {
     },
     handler: async ({ typeName }: { typeName: string }) => {
         const result = await getTypeInfo(typeName);
-
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        const { wrapToolResponse } = await import('./shared-utils.js');
+        return wrapToolResponse(result);
     }
 }; 

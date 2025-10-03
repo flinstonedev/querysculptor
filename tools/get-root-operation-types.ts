@@ -1,33 +1,47 @@
 import { z } from "zod";
 import { GraphQLSchema } from 'graphql';
-import { resolveEndpointAndHeaders, fetchAndCacheSchema } from "./shared-utils.js";
+import {
+    resolveEndpointAndHeaders,
+    fetchAndCacheSchema,
+    createSuccessResponse,
+    createErrorResponse,
+    ErrorCode
+} from "./shared-utils.js";
 
 // Core business logic - testable function
-export async function getRootOperationTypes(): Promise<{
-    query_type?: string | null;
-    mutation_type?: string | null;
-    subscription_type?: string | null;
-    error?: string;
-}> {
+export async function getRootOperationTypes() {
+    const startTime = Date.now();
     const { url: resolvedUrl, headers } = resolveEndpointAndHeaders();
 
     if (!resolvedUrl) {
-        return {
-            error: "No default GraphQL endpoint configured in environment variables (DEFAULT_GRAPHQL_ENDPOINT)"
-        };
+        return createErrorResponse(
+            "No default GraphQL endpoint configured in environment variables (DEFAULT_GRAPHQL_ENDPOINT)",
+            {
+                errorCode: ErrorCode.SCHEMA_ERROR,
+                suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT in your .env file'
+            }
+        );
     }
 
     try {
         const schema = await fetchAndCacheSchema(headers);
-        return {
-            query_type: schema.getQueryType()?.name || null,
-            mutation_type: schema.getMutationType()?.name || null,
-            subscription_type: schema.getSubscriptionType()?.name || null
-        };
+        return createSuccessResponse(
+            {
+                query_type: schema.getQueryType()?.name || null,
+                mutation_type: schema.getMutationType()?.name || null,
+                subscription_type: schema.getSubscriptionType()?.name || null
+            },
+            {
+                executionTime: Date.now() - startTime
+            }
+        );
     } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : String(error)
-        };
+        return createErrorResponse(
+            error instanceof Error ? error.message : String(error),
+            {
+                errorCode: ErrorCode.SCHEMA_ERROR
+            }
+        );
     }
 }
 
@@ -39,12 +53,7 @@ export const getRootOperationTypesTool = {
     },
     handler: async ({ includeFieldCounts = false }: { includeFieldCounts?: boolean }) => {
         const result = await getRootOperationTypes();
-
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        const { wrapToolResponse } = await import('./shared-utils.js');
+        return wrapToolResponse(result);
     }
 }; 

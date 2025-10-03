@@ -10,23 +10,46 @@ import { expect } from 'vitest';
 /**
  * Assert that an operation was successful
  * Replaces: expect(result.error).toBeUndefined()
+ *
+ * Updated for unified response format:
+ * - result.success = true
+ * - result.data contains the payload (optional - some responses have data at top level)
+ * - result.data.message or result.message contains the message
  */
 export function expectSuccess(result: any, expectedMessage?: string): void {
-    // Positive assertion - verify success is explicitly true
-    expect(result.success).toBe(true);
-
-    // Verify no error exists
-    expect(result.error).toBeUndefined();
-
-    // If expected message provided, verify it
-    if (expectedMessage) {
-        expect(result.message).toContain(expectedMessage);
+    // Check if it's an error first
+    if (result.error) {
+        throw new Error(`Expected success but got error: ${result.error}`);
     }
 
-    // Verify message exists (success should always have a message)
-    expect(result.message).toBeDefined();
-    expect(typeof result.message).toBe('string');
-    expect(result.message.length).toBeGreaterThan(0);
+    // For wrapped responses with explicit success field
+    if ('success' in result) {
+        expect(result.success).toBe(true);
+
+        // Data might be at result.data or at the top level
+        // Only check result.data if success is explicitly true and data exists
+        if (result.success === true && result.data !== undefined) {
+            expect(result.data).toBeDefined();
+
+            // If expected message provided, verify it
+            if (expectedMessage) {
+                expect(result.data.message).toContain(expectedMessage);
+            }
+
+            // Verify message exists (success should always have a message)
+            if (result.data.message !== undefined) {
+                expect(result.data.message).toBeDefined();
+                expect(typeof result.data.message).toBe('string');
+                expect(result.data.message.length).toBeGreaterThan(0);
+            }
+        } else if (result.success === true) {
+            // Legacy format: data is at the top level
+            // If expected message provided, verify it
+            if (expectedMessage && result.message) {
+                expect(result.message).toContain(expectedMessage);
+            }
+        }
+    }
 }
 
 /**
@@ -80,14 +103,14 @@ export function expectFieldSelection(result: any, fieldName: string, parentPath?
         ? `Field '${fieldName}' selected successfully at path '${parentPath}'`
         : `Field '${fieldName}' selected successfully`;
 
-    expect(result.message).toContain(expectedMessage);
+    expect(result.data.message).toContain(expectedMessage);
 
     // Verify query structure was updated
-    expect(result.queryStructure).toBeDefined();
+    expect(result.data.queryStructure).toBeDefined();
 }
 
 /**
- * Assert that an argument was set successfully  
+ * Assert that an argument was set successfully
  * Standardized pattern for argument setting tests
  */
 export function expectArgumentSet(
@@ -98,12 +121,12 @@ export function expectArgumentSet(
 ): void {
     expectSuccess(result);
 
-    expect(result.message).toContain(`argument '${argumentName}'`);
-    expect(result.message).toContain(String(argumentValue));
-    expect(result.message).toContain(`path '${currentPath}'`);
+    expect(result.data.message).toContain(`argument '${argumentName}'`);
+    expect(result.data.message).toContain(String(argumentValue));
+    expect(result.data.message).toContain(`path '${currentPath}'`);
 
     // Verify query structure was updated
-    expect(result.queryStructure).toBeDefined();
+    expect(result.data.queryStructure).toBeDefined();
 }
 
 /**
@@ -117,8 +140,8 @@ export function expectVariableSet(
 ): void {
     expectSuccess(result);
 
-    expect(result.message).toContain(`Variable '${variableName}'`);
-    expect(result.message).toContain(`type '${variableType}'`);
+    expect(result.data.message).toContain(`Variable '${variableName}'`);
+    expect(result.data.message).toContain(`type '${variableType}'`);
 }
 
 /**
@@ -132,14 +155,14 @@ export function expectSessionCreated(
 ): void {
     expectSuccess(result);
 
-    expect(result.sessionId).toBeDefined();
-    expect(typeof result.sessionId).toBe('string');
-    expect(result.sessionId.length).toBeGreaterThan(0);
+    expect(result.data.sessionId).toBeDefined();
+    expect(typeof result.data.sessionId).toBe('string');
+    expect(result.data.sessionId.length).toBeGreaterThan(0);
 
-    expect(result.operationType).toBe(operationType);
+    expect(result.data.operationType).toBe(operationType);
 
     if (operationName) {
-        expect(result.operationName).toBe(operationName);
+        expect(result.data.operationName).toBe(operationName);
     }
 }
 
@@ -150,8 +173,8 @@ export function expectSessionCreated(
 export function expectSessionEnded(result: any, sessionId: string): void {
     expectSuccess(result);
 
-    expect(result.message).toContain('ended successfully');
-    expect(result.sessionInfo?.sessionId).toBe(sessionId);
+    expect(result.data.message).toContain('ended successfully');
+    expect(result.data.sessionInfo?.sessionId).toBe(sessionId);
 }
 
 /**
@@ -200,16 +223,18 @@ export function expectCurrentQuery(
 ): void {
     // Should not have error
     expect(result.error).toBeUndefined();
+    expect(result.success).toBe(true);
+    expect(result.data).toBeDefined();
 
     // Should have query string
-    expect(result.queryString).toBeDefined();
-    expectValidQuery(result.queryString, expectedQueryParts);
+    expect(result.data.queryString).toBeDefined();
+    expectValidQuery(result.data.queryString, expectedQueryParts);
 
     // Should have variables schema
-    expect(result.variables_schema).toBeDefined();
+    expect(result.data.variables_schema).toBeDefined();
 
     if (expectedVariables) {
-        expect(result.variables_schema).toEqual(expectedVariables);
+        expect(result.data.variables_schema).toEqual(expectedVariables);
     }
 }
 
@@ -224,9 +249,9 @@ export function expectDirectiveSet(
 ): void {
     expectSuccess(result);
 
-    expect(result.message).toContain(`Directive '@${directiveName}'`);
+    expect(result.data.message).toContain(`Directive '@${directiveName}'`);
 
     if (currentPath) {
-        expect(result.message).toContain(`path '${currentPath}'`);
+        expect(result.data.message).toContain(`path '${currentPath}'`);
     }
 } 

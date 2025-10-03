@@ -123,8 +123,8 @@ export class AgentDebugHelper {
             }
 
             // Analyze session state
-            const queryString = response.queryString || '';
-            const variables = response.variables || {};
+            const queryString = response.data?.queryString || response.queryString || '';
+            const variables = response.data?.variables || response.variables || {};
             const stateSize = JSON.stringify(response).length;
 
             if (queryString.trim() === '') {

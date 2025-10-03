@@ -92,13 +92,6 @@ describe('GitHub Search Scenario - Session Issues Reproduction', () => {
                 console.log('Recovery scenario failed:', result.errors);
             }
         });
-
-        it.skip('should handle parallel operations without session conflicts', async () => {
-            // This test is specifically designed for GitHub API scenarios but we're running against Pokemon API
-            // The core session persistence functionality has been thoroughly tested by other tests
-            // Skipping this GitHub-specific test to avoid false failures from schema mismatches
-            console.log('\n⚡ Skipping GitHub-specific parallel operations test when using Pokemon API...');
-        });
     });
 
     describe('Session Persistence Deep Dive', () => {

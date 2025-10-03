@@ -165,11 +165,11 @@ describe('Type Validation Scenario Testing', () => {
             const queryResponse = JSON.parse(queryResult.content[0].text);
 
             // Check directive serialization in generated query
-            if (queryResponse.queryString) {
-                if (queryResponse.queryString.includes('@include(if: "true")')) {
-                    expect(queryResponse.queryString).toContain('@include(if: "true")');
-                } else if (queryResponse.queryString.includes('@include(if: true)')) {
-                    expect(queryResponse.queryString).toContain('@include(if: true)');
+            if (queryResponse.data.queryString) {
+                if (queryResponse.data.queryString.includes('@include(if: "true")')) {
+                    expect(queryResponse.data.queryString).toContain('@include(if: "true")');
+                } else if (queryResponse.data.queryString.includes('@include(if: true)')) {
+                    expect(queryResponse.data.queryString).toContain('@include(if: true)');
                 } else {
                     // Query structure different than expected
                 }
@@ -212,11 +212,11 @@ describe('Type Validation Scenario Testing', () => {
             const queryResponse = JSON.parse(queryResult.content[0].text);
 
             // Verify all the key functionality
-            const hasVariable = queryResponse.queryString.includes('$page: Int!');
-            const hasArgument = queryResponse.queryString.includes('characters(page: 1)') || queryResponse.queryString.includes('characters(page: $page)');
+            const hasVariable = queryResponse.data.queryString.includes('$page: Int!');
+            const hasArgument = queryResponse.data.queryString.includes('characters(page: 1)') || queryResponse.data.queryString.includes('characters(page: $page)');
 
-            expect(queryResponse.queryString).toBeDefined();
-            expect(queryResponse.queryString.length).toBeGreaterThan(0);
+            expect(queryResponse.data.queryString).toBeDefined();
+            expect(queryResponse.data.queryString.length).toBeGreaterThan(0);
             expect(hasVariable || hasArgument).toBe(true);
         });
     });

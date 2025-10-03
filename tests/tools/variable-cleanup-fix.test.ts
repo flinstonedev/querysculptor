@@ -69,8 +69,8 @@ describe('Variable Argument Cleanup Bug Fix', () => {
         const result = await removeQueryVariable('test-session', '$size1');
 
         expect(result.success).toBe(true);
-        expect(result.message).toContain("Variable '$size1' removed from query");
-        expect(result.message).toContain("Removed field argument 'size' from 'user.avatarUrl'");
+        expect(result.data.message).toContain("Variable '$size1' removed from query");
+        expect(result.data.message).toContain("Removed field argument 'size' from 'user.avatarUrl'");
 
         // Verify the variable was removed from schema
         expect(mockQueryState.variablesSchema['$size1']).toBeUndefined();
@@ -88,8 +88,8 @@ describe('Variable Argument Cleanup Bug Fix', () => {
         const result = await removeQueryVariable('test-session', '$includeImages');
 
         expect(result.success).toBe(true);
-        expect(result.message).toContain("Variable '$includeImages' removed from query");
-        expect(result.message).toContain("Removed field argument 'includeImages' from 'user.profile'");
+        expect(result.data.message).toContain("Variable '$includeImages' removed from query");
+        expect(result.data.message).toContain("Removed field argument 'includeImages' from 'user.profile'");
 
         // Verify the variable was removed from schema
         expect(mockQueryState.variablesSchema['$includeImages']).toBeUndefined();
@@ -124,12 +124,12 @@ describe('Variable Argument Cleanup Bug Fix', () => {
         const result = await removeQueryVariable('test-session', '$size1');
 
         expect(result.success).toBe(true);
-        expect(result.message).toContain("Variable '$size1' removed from query");
+        expect(result.data.message).toContain("Variable '$size1' removed from query");
 
         // Should clean up all references at all levels
-        expect(result.message).toContain("Removed field argument 'size' from 'user.avatarUrl'");
-        expect(result.message).toContain("Removed field argument 'limit' from 'user.posts'");
-        expect(result.message).toContain("Removed field argument 'first' from 'user.posts.comments'");
+        expect(result.data.message).toContain("Removed field argument 'size' from 'user.avatarUrl'");
+        expect(result.data.message).toContain("Removed field argument 'limit' from 'user.posts'");
+        expect(result.data.message).toContain("Removed field argument 'first' from 'user.posts.comments'");
 
         // Verify all arguments were cleaned up
         expect(mockQueryState.queryStructure.fields.user.fields.avatarUrl.args.size).toBeUndefined();
@@ -161,8 +161,8 @@ describe('Variable Argument Cleanup Bug Fix', () => {
         const result = await removeQueryVariable('test-session', '$unusedVar');
 
         expect(result.success).toBe(true);
-        expect(result.message).toBe("Variable '$unusedVar' removed from query.");
-        expect(result.message).not.toContain("Removed field argument");
+        expect(result.data.message).toBe("Variable '$unusedVar' removed from query.");
+        expect(result.data.message).not.toContain("Removed field argument");
 
         // All existing arguments should remain
         expect(mockQueryState.queryStructure.fields.user.args.id).toBe('$userId');

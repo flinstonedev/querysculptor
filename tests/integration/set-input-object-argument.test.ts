@@ -110,25 +110,25 @@ describe('setInputObjectArgument', () => {
         it('should handle nested input objects correctly', async () => {
             const result = await setInputObjectArgument('test-session', 'updateUser', 'filter', 'origin.name', 'Earth', true);
             expect(result.success).toBe(true);
-            expect(result.message).toContain("Set 'origin.name' to '\"Earth\"' in input object 'filter'");
+            expect(result.data.message).toContain("Set 'origin.name' to '\"Earth\"' in input object 'filter'");
         });
 
         it('should set simple field values correctly', async () => {
             const result = await setInputObjectArgument('test-session', 'updateUser', 'input', 'name', 'John Doe', true);
             expect(result.success).toBe(true);
-            expect(result.message).toContain("Set 'name' to '\"John Doe\"' in input object 'input'");
+            expect(result.data.message).toContain("Set 'name' to '\"John Doe\"' in input object 'input'");
         });
 
         it('should set numeric field values correctly', async () => {
             const result = await setInputObjectArgument('test-session', 'updateUser', 'input', 'age', 25, true);
             expect(result.success).toBe(true);
-            expect(result.message).toContain("Set 'age' to '25' in input object 'input'");
+            expect(result.data.message).toContain("Set 'age' to '25' in input object 'input'");
         });
 
         it('should set boolean field values correctly', async () => {
             const result = await setInputObjectArgument('test-session', 'updateUser', 'input', 'active', true, true);
             expect(result.success).toBe(true);
-            expect(result.message).toContain("Set 'active' to 'true' in input object 'input'");
+            expect(result.data.message).toContain("Set 'active' to 'true' in input object 'input'");
         });
     });
 }); 

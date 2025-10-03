@@ -95,9 +95,9 @@ describe('Agent Inline Fragment Fix', () => {
             sessionId
         });
 
-        console.log('Final query check successful:', !finalQueryResponse.error);
+        console.log('Final query response:', JSON.stringify(finalQueryResponse, null, 2));
         expect(finalQueryResponse.error).toBeUndefined();
-        expect(finalQueryResponse.queryString).toBeDefined();
+        expect(finalQueryResponse.data.queryString).toBeDefined();
 
         console.log('\n🎉 Session persistence test completed successfully!');
         console.log('This demonstrates that the session normalization fix resolves the inline fragment issues.');
@@ -187,7 +187,7 @@ describe('Agent Inline Fragment Fix', () => {
             operationType: 'query',
             operationName: 'TrendingAIRepositories'
         });
-        
+
         let sessionId = sessionResponse.sessionId;
         console.log(`\n✅ Step 1 complete - Session: ${sessionId}`);
 

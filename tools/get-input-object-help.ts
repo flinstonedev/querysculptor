@@ -5,7 +5,14 @@ import {
     getNamedType,
     GraphQLNamedType
 } from 'graphql';
-import { fetchAndCacheSchema, resolveEndpointAndHeaders, getTypeNameStr } from "./shared-utils.js";
+import {
+    fetchAndCacheSchema,
+    resolveEndpointAndHeaders,
+    getTypeNameStr,
+    createSuccessResponse,
+    createErrorResponse,
+    ErrorCode
+} from "./shared-utils.js";
 
 // Helper function to generate example values
 function generateExampleValue(gqlType: any): any {
@@ -29,31 +36,33 @@ function generateExampleValue(gqlType: any): any {
 // Core business logic - testable function
 export async function getInputObjectHelp(
     inputTypeName: string
-): Promise<{
-    inputTypeName?: string;
-    description?: string;
-    fields?: any[];
-    requiredFields?: string[];
-    exampleUsage?: string;
-    message?: string;
-    error?: string;
-}> {
+) {
+    const startTime = Date.now();
+
     try {
         const { url: resolvedUrl, headers } = resolveEndpointAndHeaders();
 
         if (!resolvedUrl) {
-            return {
-                error: "No default GraphQL endpoint configured in environment variables (DEFAULT_GRAPHQL_ENDPOINT)"
-            };
+            return createErrorResponse(
+                "No default GraphQL endpoint configured in environment variables (DEFAULT_GRAPHQL_ENDPOINT)",
+                {
+                    errorCode: ErrorCode.SCHEMA_ERROR,
+                    suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT in your .env file'
+                }
+            );
         }
 
         const schema = await fetchAndCacheSchema(headers);
         const inputType = schema.getType(inputTypeName);
 
         if (!inputType || !isInputObjectType(inputType)) {
-            return {
-                error: `Input type '${inputTypeName}' not found or not an input object type`
-            };
+            return createErrorResponse(
+                `Input type '${inputTypeName}' not found or not an input object type`,
+                {
+                    errorCode: ErrorCode.SCHEMA_ERROR,
+                    suggestion: 'Verify the type name and ensure it is an input type'
+                }
+            );
         }
 
         const fields = inputType.getFields();
@@ -78,17 +87,25 @@ export async function getInputObjectHelp(
             ? requiredFields.slice(0, 3).map(f => `${f.name}: ${JSON.stringify(f.exampleValue)}`).join(', ')
             : fieldInfo.slice(0, 3).map(f => `${f.name}: ${JSON.stringify(f.exampleValue)}`).join(', ');
 
-        return {
-            inputTypeName: inputTypeName,
-            description: inputType.description || `Input type for ${inputTypeName}`,
-            fields: fieldInfo,
-            requiredFields: fieldInfo.filter(f => f.required).map(f => f.name),
-            exampleUsage: `{ ${inputTypeName.toLowerCase()}: { ${exampleFields} } }`
-        };
+        return createSuccessResponse(
+            {
+                inputTypeName: inputTypeName,
+                description: inputType.description || `Input type for ${inputTypeName}`,
+                fields: fieldInfo,
+                requiredFields: fieldInfo.filter(f => f.required).map(f => f.name),
+                exampleUsage: `{ ${inputTypeName.toLowerCase()}: { ${exampleFields} } }`
+            },
+            {
+                executionTime: Date.now() - startTime
+            }
+        );
     } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : String(error)
-        };
+        return createErrorResponse(
+            error instanceof Error ? error.message : String(error),
+            {
+                errorCode: ErrorCode.SCHEMA_ERROR
+            }
+        );
     }
 }
 
@@ -102,12 +119,7 @@ export const getInputObjectHelpTool = {
         inputTypeName: string
     }) => {
         const result = await getInputObjectHelp(inputTypeName);
-
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        const { wrapToolResponse } = await import('./shared-utils.js');
+        return wrapToolResponse(result);
     }
 }; 

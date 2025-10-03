@@ -32,12 +32,12 @@ vi.mock('../../tools/shared-utils', async () => {
 
     const testSchema = buildSchema(`
         directive @include(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
-        directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT  
+        directive @skip(if: Boolean!) on FIELD | FRAGMENT_SPREAD | INLINE_FRAGMENT
         directive @deprecated(reason: String = "No longer supported") on FIELD_DEFINITION | ENUM_VALUE
         directive @live on QUERY | MUTATION | SUBSCRIPTION
         directive @myDirective(arg1: String, arg2: Int) on FIELD
         directive @anotherDirective(argA: Boolean) on FIELD
-        
+
         type Query {
             user: String
             status: String
@@ -50,6 +50,24 @@ vi.mock('../../tools/shared-utils', async () => {
         saveQueryState: vi.fn().mockImplementation(async (sid, qs) => {
             Object.assign(mockQueryState, qs);
         }),
+        createSuccessResponse: vi.fn().mockImplementation((data: any, options?: any) => ({
+            success: true,
+            error: undefined,
+            data
+        })),
+        createErrorResponse: vi.fn().mockImplementation((error: string, options?: any) => ({
+            success: false,
+            error,
+            data: null
+        })),
+        wrapToolResponse: vi.fn().mockImplementation((response: any) => ({
+            content: [{ type: 'text', text: JSON.stringify(response) }]
+        })),
+        ErrorCode: {
+            VALIDATION_ERROR: 'VALIDATION_ERROR',
+            NOT_FOUND: 'NOT_FOUND',
+            INVALID_INPUT: 'INVALID_INPUT'
+        }
     });
 });
 
@@ -94,14 +112,14 @@ describe('Directive Handling', () => {
         const { setFieldDirective } = await import('../../tools/set-field-directive');
         const result = await setFieldDirective('test-session', 'user', 'include', 'if', '$myVar');
         expect(result.success).toBe(true);
-        expect(result.message).toContain("Directive '@include' applied to field at path 'user'");
+        expect(result.data.message).toContain("Directive '@include' applied to field at path 'user'");
     });
 
     it('should set a directive on the operation', async () => {
         const { setOperationDirective } = await import('../../tools/set-operation-directive');
         const result = await setOperationDirective('test-session', 'live');
         expect(result.success).toBe(true);
-        expect(result.message).toContain("Operation directive '@live' applied to query.");
+        expect(result.data.message).toContain("Operation directive '@live' applied to query.");
     });
 
     it('should generate directive with arguments when argument provided', async () => {
@@ -219,9 +237,9 @@ describe('Directive Handling', () => {
 
             expect(result.success).toBe(true);
             expect(result.error).toBeUndefined();
-            expect(result.message).toContain("Directive '@include' applied to field at path 'user'");
-            expect(result.argumentName).toBe('if');
-            expect(result.argumentValue).toBe('$myVar');
+            expect(result.data.message).toContain("Directive '@include' applied to field at path 'user'");
+            expect(result.data.argumentName).toBe('if');
+            expect(result.data.argumentValue).toBe('$myVar');
         });
 
         it('should support directive arguments for @skip directive', async () => {
@@ -236,8 +254,8 @@ describe('Directive Handling', () => {
 
             expect(result.success).toBe(true);
             expect(result.error).toBeUndefined();
-            expect(result.argumentName).toBe('if');
-            expect(result.argumentValue).toBe('$skipStatus');
+            expect(result.data.argumentName).toBe('if');
+            expect(result.data.argumentValue).toBe('$skipStatus');
         });
 
         it('should support boolean literal values for directive arguments', async () => {
@@ -252,8 +270,8 @@ describe('Directive Handling', () => {
 
             expect(result.success).toBe(true);
             expect(result.error).toBeUndefined();
-            expect(result.argumentName).toBe('if');
-            expect(result.argumentValue).toBe(true);
+            expect(result.data.argumentName).toBe('if');
+            expect(result.data.argumentValue).toBe(true);
         });
 
         it('should support string literal values for directive arguments', async () => {
@@ -268,8 +286,8 @@ describe('Directive Handling', () => {
 
             expect(result.success).toBe(true);
             expect(result.error).toBeUndefined();
-            expect(result.argumentName).toBe('reason');
-            expect(result.argumentValue).toBe('Use newField instead');
+            expect(result.data.argumentName).toBe('reason');
+            expect(result.data.argumentValue).toBe('Use newField instead');
         });
     });
 });

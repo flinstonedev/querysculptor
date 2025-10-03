@@ -1,39 +1,56 @@
 import { z } from "zod";
-import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils } from "./shared-utils.js";
+import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils ,
+    createSuccessResponse,
+    createErrorResponse,
+    ErrorCode
+} from "./shared-utils.js";
 
 // Core business logic - testable function
 export async function applyNamedFragment(
     sessionId: string,
     currentPath: string = "",
     fragmentName: string
-): Promise<{
-    success?: boolean;
-    message?: string;
-    currentPath?: string;
-    fragmentName?: string;
-    error?: string;
-}> {
+) {
+    const startTime = Date.now();
+
     try {
         // Validate fragment name syntax
         if (!GraphQLValidationUtils.isValidGraphQLName(fragmentName)) {
-            return {
-                error: `Invalid fragment name "${fragmentName}". Must match /^[_A-Za-z][_0-9A-Za-z]*$/`
-            };
+            return createErrorResponse(
+                `Invalid fragment name "${fragmentName}". Must match /^[_A-Za-z][_0-9A-Za-z]*$/`,
+                {
+                    errorCode: ErrorCode.VALIDATION_ERROR,
+                    sessionId,
+                    details: { fragmentName },
+                    suggestion: 'Use a valid GraphQL identifier (start with letter or underscore, followed by letters, digits, or underscores)'
+                }
+            );
         }
 
         // Load query state
         const queryState = await loadQueryState(sessionId);
         if (!queryState) {
-            return {
-                error: 'Session not found.'
-            };
+            return createErrorResponse(
+                'Session not found.',
+                {
+                    errorCode: ErrorCode.SESSION_NOT_FOUND,
+                    sessionId,
+                    suggestion: 'Start a new session with start-query-session'
+                }
+            );
         }
 
         // Check if fragment exists
         if (!queryState.fragments || !queryState.fragments[fragmentName]) {
-            return {
-                error: `Fragment '${fragmentName}' not found. Define it first using define-named-fragment.`
-            };
+            return createErrorResponse(
+                `Fragment '${fragmentName}' not found.`,
+                {
+                    errorCode: ErrorCode.FRAGMENT_ERROR,
+                    sessionId,
+                    details: { fragmentName },
+                    suggestion: 'Define the fragment first with define-named-fragment'
+                }
+            );
         }
 
         // Navigate to the current node in the query structure
@@ -42,9 +59,15 @@ export async function applyNamedFragment(
             const pathParts = currentPath.split('.');
             for (const part of pathParts) {
                 if (!parentNode.fields || !parentNode.fields[part]) {
-                    return {
-                        error: `Path '${currentPath}' not found in query structure.`
-                    };
+                    return createErrorResponse(
+                        `Path '${currentPath}' not found in query structure.`,
+                        {
+                            errorCode: ErrorCode.VALIDATION_ERROR,
+                            sessionId,
+                            details: { currentPath, missingPart: part },
+                            suggestion: 'Use add-field to create the path first, or verify the path exists'
+                        }
+                    );
                 }
                 parentNode = parentNode.fields[part];
             }
@@ -62,16 +85,27 @@ export async function applyNamedFragment(
         // Save updated query state
         await saveQueryState(sessionId, queryState);
 
-        return {
-            success: true,
-            message: `Fragment '${fragmentName}' applied at path '${currentPath}'.`,
-            fragmentName,
-            currentPath: currentPath
-        };
+        return createSuccessResponse(
+            {
+                message: `Fragment '${fragmentName}' applied at path '${currentPath}'.`,
+                fragmentName,
+                currentPath: currentPath
+            },
+            {
+                sessionId,
+                stateVersion: queryState.stateVersion,
+                executionTime: Date.now() - startTime
+            }
+        );
     } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : String(error)
-        };
+        return createErrorResponse(
+            error instanceof Error ? error.message : String(error),
+            {
+                errorCode: ErrorCode.INTERNAL_ERROR,
+                sessionId,
+                details: { fragmentName, currentPath }
+            }
+        );
     }
 }
 
@@ -90,11 +124,7 @@ export const applyNamedFragmentTool = {
     }) => {
         const result = await applyNamedFragment(sessionId, currentPath, fragmentName);
 
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        const { wrapToolResponse } = await import('./shared-utils.js');
+        return wrapToolResponse(result);
     }
 }; 

@@ -137,14 +137,15 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
 
                 // Should NOT fail with "Type Int expects an integer, but received 1"
                 expectSuccess(argResponse, 'page');
+                // Message is at argResponse.message not argResponse.data.message for direct format
                 expect(argResponse.message).toContain('1');
 
                 // Query should show the argument correctly as number, not string
                 const queryResult = await getCurrentQueryTool.handler({ sessionId });
                 const queryResponse = JSON.parse(queryResult.content[0].text);
 
-                expect(queryResponse.queryString).toContain('characters(page: 1)');
-                expect(queryResponse.queryString).not.toContain('characters(page: "1")');
+                expect(queryResponse.data.queryString).toContain('characters(page: 1)');
+                expect(queryResponse.data.queryString).not.toContain('characters(page: "1")');
             });
 
             it('should accept JavaScript number 42 as GraphQL Int', async () => {
@@ -246,8 +247,8 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
                 const queryResult = await getCurrentQueryTool.handler({ sessionId });
                 const queryResponse = JSON.parse(queryResult.content[0].text);
 
-                expect(queryResponse.queryString).toContain('includeImages: true');
-                expect(queryResponse.queryString).not.toContain('includeImages: "true"');
+                expect(queryResponse.data.queryString).toContain('includeImages: true');
+                expect(queryResponse.data.queryString).not.toContain('includeImages: "true"');
             });
 
             it('should accept JavaScript boolean false as GraphQL Boolean', async () => {
@@ -295,8 +296,8 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
                 const queryResult = await getCurrentQueryTool.handler({ sessionId });
                 const queryResponse = JSON.parse(queryResult.content[0].text);
 
-                expect(queryResponse.queryString).toContain('@include(if: true)');
-                expect(queryResponse.queryString).not.toContain('@include(if: "true")');
+                expect(queryResponse.data.queryString).toContain('@include(if: true)');
+                expect(queryResponse.data.queryString).not.toContain('@include(if: "true")');
             });
 
             it('should accept JavaScript boolean for @skip directive', async () => {
@@ -386,9 +387,9 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
                 const queryResult = await getCurrentQueryTool.handler({ sessionId });
                 const queryResponse = JSON.parse(queryResult.content[0].text);
 
-                if (queryResponse.queryString) {
-                    expect(queryResponse.queryString).toContain('$page: Int = 1');
-                    expect(queryResponse.queryString).not.toContain('$page: Int = "1"');
+                if (queryResponse.data.queryString) {
+                    expect(queryResponse.data.queryString).toContain('$page: Int = 1');
+                    expect(queryResponse.data.queryString).not.toContain('$page: Int = "1"');
                 }
             });
 
@@ -492,10 +493,10 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
                 const queryResponse = JSON.parse(queryResult.content[0].text);
 
                 // Should generate valid parameterized query
-                expect(queryResponse.queryString).toContain('query TestQuery($page: Int!)');
-                expect(queryResponse.queryString).toContain('characters(page: $page)');
-                expect(queryResponse.queryString).toContain('results');
-                expect(queryResponse.queryString).toContain('name');
+                expect(queryResponse.data.queryString).toContain('query TestQuery($page: Int!)');
+                expect(queryResponse.data.queryString).toContain('characters(page: $page)');
+                expect(queryResponse.data.queryString).toContain('results');
+                expect(queryResponse.data.queryString).toContain('name');
             });
 
             it('should enable conditional field inclusion with @include directive', async () => {
@@ -551,10 +552,10 @@ describe('Critical Type Validation Issues - Production Blocker', () => {
                 const queryResponse = JSON.parse(queryResult.content[0].text);
 
                 // Should generate valid conditional query
-                expect(queryResponse.queryString).toContain('query TestQuery($includeImage: Boolean!)');
-                expect(queryResponse.queryString).toContain('character(id: 1)');
-                expect(queryResponse.queryString).toContain('name');
-                expect(queryResponse.queryString).toContain('image @include(if: $includeImage)');
+                expect(queryResponse.data.queryString).toContain('query TestQuery($includeImage: Boolean!)');
+                expect(queryResponse.data.queryString).toContain('character(id: 1)');
+                expect(queryResponse.data.queryString).toContain('name');
+                expect(queryResponse.data.queryString).toContain('image @include(if: $includeImage)');
             });
         });
 

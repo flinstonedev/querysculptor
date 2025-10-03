@@ -251,6 +251,8 @@ const rawSchemaJsonCache = new Map<string, any>();
 
 // Query state structure
 export interface QueryState {
+    stateVersion: number;                  // NEW: Version number for optimistic concurrency control
+    lastModified: string;                   // NEW: ISO timestamp of last modification
     headers: Record<string, string>;
     operationType: string;
     operationTypeName: string;
@@ -1450,17 +1452,31 @@ export function generateSessionId(): string {
 }
 
 // Query state storage functions
-export async function saveQueryState(sessionId: string, queryState: QueryState): Promise<void> {
-    const serializableData = { ...queryState };
+export async function saveQueryState(sessionId: string, queryState: QueryState, expectedVersion?: number): Promise<void> {
     const normalizedId = normalizeSessionId(sessionId);
+
     await withRedisRetry('saveQueryState', async () => {
+        // Optimistic concurrency control
+        if (expectedVersion !== undefined) {
+            const current = await loadQueryState(sessionId);
+            if (current && current.stateVersion !== expectedVersion) {
+                throw new Error(`State version conflict. Expected ${expectedVersion}, got ${current.stateVersion}`);
+            }
+        }
+
+        // Increment version and update timestamp
+        queryState.stateVersion = (queryState.stateVersion || 0) + 1;
+        queryState.lastModified = new Date().toISOString();
+
+        const serializableData = { ...queryState };
         const sessionKey = `querystate:${normalizedId}`;
+
         if (HAS_SESSION_TTL) {
             await redis.setEx(sessionKey, SESSION_TTL_SECONDS, JSON.stringify(serializableData));
         } else {
             await redis.set(sessionKey, JSON.stringify(serializableData));
         }
-        console.log(`Session ${normalizedId} saved to Redis`);
+        console.log(`Session ${normalizedId} saved to Redis (version ${queryState.stateVersion})`);
     });
 }
 
@@ -1475,7 +1491,14 @@ export async function loadQueryState(sessionId: string): Promise<QueryState | nu
         }
         const jsonString = typeof data === 'string' ? data : (data as Buffer).toString();
         const queryState = JSON.parse(jsonString);
-        console.log(`Session ${normalizedId} loaded from Redis`);
+
+        // Auto-migrate old sessions without version
+        if (queryState.stateVersion === undefined) {
+            queryState.stateVersion = 0;
+            queryState.lastModified = queryState.createdAt || new Date().toISOString();
+        }
+
+        console.log(`Session ${normalizedId} loaded from Redis (version ${queryState.stateVersion})`);
         if (HAS_SESSION_TTL) {
             try {
                 await redis.expire(sessionKey, SESSION_TTL_SECONDS);
@@ -1998,4 +2021,138 @@ export function validateInputComplexity(value: any, name: string): string | null
     }
 
     return check(value, 1);
-} 
+}
+
+// ============================================================================
+// Unified Response Envelope System
+// ============================================================================
+
+export enum ErrorCode {
+    SESSION_NOT_FOUND = 'SESSION_NOT_FOUND',
+    VALIDATION_ERROR = 'VALIDATION_ERROR',
+    SCHEMA_ERROR = 'SCHEMA_ERROR',
+    REDIS_UNAVAILABLE = 'REDIS_UNAVAILABLE',
+    ARGUMENT_ERROR = 'ARGUMENT_ERROR',
+    FIELD_ERROR = 'FIELD_ERROR',
+    VARIABLE_ERROR = 'VARIABLE_ERROR',
+    FRAGMENT_ERROR = 'FRAGMENT_ERROR',
+    DIRECTIVE_ERROR = 'DIRECTIVE_ERROR',
+    EXECUTION_ERROR = 'EXECUTION_ERROR',
+    INTERNAL_ERROR = 'INTERNAL_ERROR',
+}
+
+export interface ToolResponse<T = any> {
+    success: boolean;
+    data?: T;
+    error?: string;
+    warnings?: string[];
+    metadata?: {
+        sessionId?: string;
+        stateVersion?: number;
+        executionTime?: number;
+        timestamp?: string;
+    };
+    details?: {
+        errorCode?: ErrorCode;
+        suggestion?: string;
+        field?: string;
+        path?: string;
+        availableOptions?: string[];
+        [key: string]: any;
+    };
+}
+
+/**
+ * Create a standardized success response
+ */
+export function createSuccessResponse<T>(data: T, options?: {
+    warnings?: string[];
+    sessionId?: string;
+    stateVersion?: number;
+    executionTime?: number;
+}): ToolResponse<T> {
+    return {
+        success: true,
+        data,
+        warnings: options?.warnings,
+        metadata: {
+            sessionId: options?.sessionId,
+            stateVersion: options?.stateVersion,
+            executionTime: options?.executionTime,
+            timestamp: new Date().toISOString(),
+        }
+    };
+}
+
+/**
+ * Create a standardized error response
+ */
+export function createErrorResponse(error: string, options?: {
+    errorCode?: ErrorCode;
+    suggestion?: string;
+    field?: string;
+    path?: string;
+    availableOptions?: string[];
+    sessionId?: string;
+    details?: Record<string, any>;
+}): ToolResponse {
+    return {
+        success: false,
+        error,
+        details: {
+            errorCode: options?.errorCode || ErrorCode.INTERNAL_ERROR,
+            suggestion: options?.suggestion,
+            field: options?.field,
+            path: options?.path,
+            availableOptions: options?.availableOptions,
+            ...options?.details,
+        },
+        metadata: {
+            sessionId: options?.sessionId,
+            timestamp: new Date().toISOString(),
+        }
+    };
+}
+
+/**
+ * Wrap a tool response in MCP content format
+ */
+export function wrapToolResponse<T>(response: ToolResponse<T>) {
+    return {
+        content: [{
+            type: 'text' as const,
+            text: JSON.stringify(response, null, 2)
+        }]
+    };
+}
+
+/**
+ * Create error response for Redis/connection issues
+ */
+export function createRedisErrorResponse(error: Error, operation: string, sessionId?: string): ToolResponse {
+    const isConnectionError = error.message.includes('ECONNREFUSED') ||
+                              error.message.includes('timeout') ||
+                              error.message.includes('Circuit Breaker') ||
+                              error.message.includes('temporarily unavailable');
+
+    if (isConnectionError) {
+        return createErrorResponse(
+            'Session storage temporarily unavailable. This is usually brief.',
+            {
+                errorCode: ErrorCode.REDIS_UNAVAILABLE,
+                suggestion: 'Wait 30-60 seconds and retry. Check status: https://status.upstash.com',
+                sessionId,
+                details: { operation }
+            }
+        );
+    }
+
+    return createErrorResponse(
+        `Session operation failed: ${error.message}`,
+        {
+            errorCode: ErrorCode.INTERNAL_ERROR,
+            sessionId,
+            details: { operation }
+        }
+    );
+}

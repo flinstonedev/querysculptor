@@ -7,6 +7,24 @@ vi.mock('../../tools/shared-utils', () => ({
     loadQueryState: vi.fn(),
     saveQueryState: vi.fn(),
     fetchAndCacheSchema: vi.fn().mockResolvedValue({}),
+    createErrorResponse: vi.fn((error: string) => ({
+        success: false,
+        error,
+        data: null
+    })),
+    createSuccessResponse: vi.fn((data: any, message?: string) => ({
+        success: true,
+        error: undefined,
+        data,
+        message
+    })),
+    ErrorCode: {
+        SESSION_NOT_FOUND: 'SESSION_NOT_FOUND',
+        VALIDATION_ERROR: 'VALIDATION_ERROR',
+        SCHEMA_ERROR: 'SCHEMA_ERROR',
+        EXECUTION_ERROR: 'EXECUTION_ERROR',
+        INTERNAL_ERROR: 'INTERNAL_ERROR'
+    },
     GraphQLValidationUtils: {
         isValidGraphQLName: vi.fn().mockReturnValue(true),
         coerceStringValue: vi.fn((v) => ({ coerced: false, value: v })),

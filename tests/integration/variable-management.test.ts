@@ -28,14 +28,14 @@ describe('Variable Management', () => {
         const { setQueryVariable } = await import('../../tools/set-query-variable');
         const result = await setQueryVariable('test-session', '$userId', 'String!', undefined);
         expect(result.success).toBe(true);
-        expect(result.message).toContain("Variable '$userId' set to type 'String!'");
+        expect(result.data.message).toContain("Variable '$userId' set to type 'String!'");
     });
 
     it('should set a variable value', async () => {
         const { setVariableValue } = await import('../../tools/set-variable-value');
         const result = await setVariableValue('test-session', '$userId', '123');
         expect(result.success).toBe(true);
-        expect(result.message).toContain("Variable '$userId' value set to \"123\".");
+        expect(result.data.message).toContain("Variable '$userId' value set to \"123\".");
     });
 
     describe('Variable Value Type Validation', () => {
@@ -45,7 +45,7 @@ describe('Variable Management', () => {
 
             expect(result.success).toBe(true);
             expect(result.error).toBeUndefined();
-            expect(result.message).toContain("Variable '$characterId' value set to \"1\"");
+            expect(result.data.message).toContain("Variable '$characterId' value set to \"1\"");
         });
 
         it('should accept number values for ID! variables', async () => {
@@ -54,7 +54,7 @@ describe('Variable Management', () => {
 
             expect(result.success).toBe(true);
             expect(result.error).toBeUndefined();
-            expect(result.message).toContain("Variable '$characterId' value set to 1");
+            expect(result.data.message).toContain("Variable '$characterId' value set to 1");
         });
 
         it('should accept boolean values for Boolean! variables', async () => {
@@ -63,7 +63,7 @@ describe('Variable Management', () => {
 
             expect(result.success).toBe(true);
             expect(result.error).toBeUndefined();
-            expect(result.message).toContain("Variable '$includeStatus' value set to true");
+            expect(result.data.message).toContain("Variable '$includeStatus' value set to true");
         });
 
         it('should accept null values for nullable variables', async () => {
@@ -72,7 +72,7 @@ describe('Variable Management', () => {
 
             expect(result.success).toBe(true);
             expect(result.error).toBeUndefined();
-            expect(result.message).toContain("Variable '$page' value set to null");
+            expect(result.data.message).toContain("Variable '$page' value set to null");
         });
     });
 
@@ -83,7 +83,7 @@ describe('Variable Management', () => {
 
             expect(result.success).toBe(true);
             expect(result.error).toBeUndefined();
-            expect(result.message).toContain("Variable '$includeStatus' set to type 'Boolean!' with default value true");
+            expect(result.data.message).toContain("Variable '$includeStatus' set to type 'Boolean!' with default value true");
         });
 
         it('should accept number defaultValue for Int variables', async () => {
@@ -92,7 +92,7 @@ describe('Variable Management', () => {
 
             expect(result.success).toBe(true);
             expect(result.error).toBeUndefined();
-            expect(result.message).toContain("Variable '$page' set to type 'Int' with default value 1");
+            expect(result.data.message).toContain("Variable '$page' set to type 'Int' with default value 1");
         });
 
         it('should accept string defaultValue for String variables', async () => {
@@ -101,7 +101,7 @@ describe('Variable Management', () => {
 
             expect(result.success).toBe(true);
             expect(result.error).toBeUndefined();
-            expect(result.message).toContain("Variable '$name' set to type 'String' with default value \"Rick\"");
+            expect(result.data.message).toContain("Variable '$name' set to type 'String' with default value \"Rick\"");
         });
     });
 
@@ -142,7 +142,7 @@ describe('Variable Management', () => {
         const { removeQueryVariable } = await import('../../tools/remove-query-variable');
         const result = await removeQueryVariable('test-session', '$userId');
         expect(result.success).toBe(true);
-        expect(result.message).toContain("Variable '$userId' removed from query.");
+        expect(result.data.message).toContain("Variable '$userId' removed from query.");
     });
 });
 

@@ -173,7 +173,8 @@ describe('Issue #3: Inline Fragment Field Rendering Bug', () => {
     describe('Error Handling', () => {
         it('should handle session not found', async () => {
             const sharedUtils = await import('../../tools/shared-utils.js');
-            vi.mocked(sharedUtils.loadQueryState).mockResolvedValueOnce(null);
+            // Mock to return null for both the initial call and the retry
+            vi.mocked(sharedUtils.loadQueryState).mockResolvedValue(null);
 
             const result = await applyInlineFragment(
                 'nonexistent-session',
@@ -182,8 +183,8 @@ describe('Issue #3: Inline Fragment Field Rendering Bug', () => {
                 ['name']
             );
 
-            expect(result.success).toBe(undefined);
-            expect(result.error).toBe('Session not found.');
+            expect(result.success).toBe(false);
+            expect(result.error).toContain('Session not found');
         });
 
         it('should handle invalid parent path', async () => {
@@ -194,7 +195,7 @@ describe('Issue #3: Inline Fragment Field Rendering Bug', () => {
                 ['name']
             );
 
-            expect(result.success).toBe(undefined);
+            expect(result.success).toBe(false);
             expect(result.error).toContain('Path');
             expect(result.error).toContain('not found');
         });

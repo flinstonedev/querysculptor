@@ -35,7 +35,7 @@ describe('Inline Fragment Session Bug', () => {
         console.log('Session creation response:', JSON.stringify(sessionResponse, null, 2));
         expect(sessionResponse.error).toBeUndefined();
         expect(sessionResponse.sessionId).toBeDefined();
-        
+
         const sessionId = sessionResponse.sessionId;
 
         // Step 2: Verify session exists by using it in another tool

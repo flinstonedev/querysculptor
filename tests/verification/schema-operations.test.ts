@@ -35,24 +35,24 @@ describe('Schema Tools', () => {
     it('should get root operation types', async () => {
         const { getRootOperationTypes } = await import('../../tools/get-root-operation-types');
         const result = await getRootOperationTypes();
-        expect(result.query_type).toBe('Query');
-        expect(result.mutation_type).toBe('Mutation'); // The global test schema has mutations
-        expect(result.subscription_type).toBeNull();
+        expect(result.data.query_type).toBe('Query');
+        expect(result.data.mutation_type).toBe('Mutation'); // The global test schema has mutations
+        expect(result.data.subscription_type).toBeNull();
     });
 
     it('should get type info for a specific type', async () => {
         const { getTypeInfo } = await import('../../tools/get-type-info.js');
         const result = await getTypeInfo('User');
-        expect(result.name).toBe('User');
-        expect(result.description).toBe(null); // Built schema doesn't have descriptions
-        expect(result.fields).toHaveLength(5); // id, name, email, active, metadata
+        expect(result.data.name).toBe('User');
+        expect(result.data.description).toBe(null); // Built schema doesn't have descriptions
+        expect(result.data.fields).toHaveLength(5); // id, name, email, active, metadata
     });
 
     it('should get field info for a specific field', async () => {
         const { getFieldInfo } = await import('../../tools/get-field-info');
         const result = await getFieldInfo('User', 'id');
-        expect(result.name).toBe('id');
-        expect(result.type).toBe('ID!'); // Non-null ID type
+        expect(result.data.name).toBe('id');
+        expect(result.data.type).toBe('ID!'); // Non-null ID type
     });
 });
 

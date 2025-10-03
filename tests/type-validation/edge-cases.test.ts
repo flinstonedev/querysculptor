@@ -199,8 +199,8 @@ describe('Type Validation Issues - Focused Analysis', () => {
 
             const queryResponse = JSON.parse(queryResult.content[0].text);
 
-            expect(queryResponse.queryString).toContain('characters');
-            expect(queryResponse.queryString).toContain('page: 1');
+            expect(queryResponse.data.queryString).toContain('characters');
+            expect(queryResponse.data.queryString).toContain('page: 1');
         });
     });
 

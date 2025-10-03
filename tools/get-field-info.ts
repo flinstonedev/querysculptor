@@ -4,25 +4,31 @@ import {
     isObjectType,
     isInterfaceType
 } from 'graphql';
-import { resolveEndpointAndHeaders, fetchAndCacheSchema, getTypeNameStr } from "./shared-utils.js";
+import {
+    resolveEndpointAndHeaders,
+    fetchAndCacheSchema,
+    getTypeNameStr,
+    createSuccessResponse,
+    createErrorResponse,
+    ErrorCode
+} from "./shared-utils.js";
 
 // Core business logic - testable function
 export async function getFieldInfo(
     typeName: string,
     fieldName: string
-): Promise<{
-    name?: string;
-    description?: string;
-    type?: string;
-    args?: any[];
-    error?: string;
-}> {
+) {
+    const startTime = Date.now();
     const { url: resolvedUrl, headers } = resolveEndpointAndHeaders();
 
     if (!resolvedUrl) {
-        return {
-            error: "No default GraphQL endpoint configured in environment variables (DEFAULT_GRAPHQL_ENDPOINT)"
-        };
+        return createErrorResponse(
+            "No default GraphQL endpoint configured in environment variables (DEFAULT_GRAPHQL_ENDPOINT)",
+            {
+                errorCode: ErrorCode.SCHEMA_ERROR,
+                suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT in your .env file'
+            }
+        );
     }
 
     try {
@@ -30,18 +36,26 @@ export async function getFieldInfo(
         const gqlType = schema.getType(typeName);
 
         if (!gqlType || (!isObjectType(gqlType) && !isInterfaceType(gqlType))) {
-            return {
-                error: `Type '${typeName}' not found or not an object/interface type`
-            };
+            return createErrorResponse(
+                `Type '${typeName}' not found or not an object/interface type`,
+                {
+                    errorCode: ErrorCode.SCHEMA_ERROR,
+                    suggestion: 'Use get-type-info to verify the type exists'
+                }
+            );
         }
 
         const fields = gqlType.getFields();
         const field = fields[fieldName];
 
         if (!field) {
-            return {
-                error: `Field '${fieldName}' not found on type '${typeName}'`
-            };
+            return createErrorResponse(
+                `Field '${fieldName}' not found on type '${typeName}'`,
+                {
+                    errorCode: ErrorCode.FIELD_ERROR,
+                    suggestion: `Available fields: ${Object.keys(fields).slice(0, 5).join(', ')}`
+                }
+            );
         }
 
         const argsInfo = field.args.map((arg: any) => ({
@@ -51,16 +65,24 @@ export async function getFieldInfo(
             defaultValue: arg.defaultValue !== undefined ? String(arg.defaultValue) : null
         }));
 
-        return {
-            name: fieldName,
-            description: field.description || undefined,
-            type: getTypeNameStr(field.type),
-            args: argsInfo
-        };
+        return createSuccessResponse(
+            {
+                name: fieldName,
+                description: field.description || undefined,
+                type: getTypeNameStr(field.type),
+                args: argsInfo
+            },
+            {
+                executionTime: Date.now() - startTime
+            }
+        );
     } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : String(error)
-        };
+        return createErrorResponse(
+            error instanceof Error ? error.message : String(error),
+            {
+                errorCode: ErrorCode.SCHEMA_ERROR
+            }
+        );
     }
 }
 
@@ -73,12 +95,7 @@ export const getFieldInfoTool = {
     },
     handler: async ({ typeName, fieldName }: { typeName: string, fieldName: string }) => {
         const result = await getFieldInfo(typeName, fieldName);
-
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        const { wrapToolResponse } = await import('./shared-utils.js');
+        return wrapToolResponse(result);
     }
 }; 

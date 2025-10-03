@@ -67,7 +67,10 @@ export async function createQuerySession(
 
         // Generate session ID and create initial query state
         const sessionId = generateSessionId();
+        const now = new Date().toISOString();
         const queryState: QueryState = {
+            stateVersion: 0,
+            lastModified: now,
             headers: mergedHeaders,
             operationType,
             operationTypeName,
@@ -82,7 +85,7 @@ export async function createQuerySession(
             variablesDefaults: {},
             variablesValues: {},
             operationDirectives: [],
-            createdAt: new Date().toISOString()
+            createdAt: now
         };
 
         // Save the query state

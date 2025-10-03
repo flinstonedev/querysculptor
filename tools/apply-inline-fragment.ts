@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils } from "./shared-utils.js";
+import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils ,
+    createSuccessResponse,
+    createErrorResponse,
+    ErrorCode
+} from "./shared-utils.js";
 
 // Core business logic - testable function
 export async function applyInlineFragment(
@@ -7,18 +11,21 @@ export async function applyInlineFragment(
     currentPath: string = "",
     onType: string,
     fieldNames: string[]
-): Promise<{
-    success?: boolean;
-    message?: string;
-    onType?: string;
-    currentPath?: string;
-    fieldNames?: string[];
-    error?: string;
-}> {
+) {
+    const startTime = Date.now();
+
     try {
         if (!sessionId || typeof sessionId !== 'string' || sessionId.trim() === '') {
-            return { error: `Invalid sessionId. Received: ${typeof sessionId === 'string' ? `"${sessionId}"` : String(sessionId)} (type: ${typeof sessionId})` };
+            return createErrorResponse(
+                `Invalid sessionId. Received: ${typeof sessionId === 'string' ? `"${sessionId}"` : String(sessionId)} (type: ${typeof sessionId})`,
+                {
+                    errorCode: ErrorCode.VALIDATION_ERROR,
+                    sessionId: sessionId || 'unknown',
+                    suggestion: 'Provide a valid non-empty session ID string'
+                }
+            );
         }
+
         // Load query state with retry for race conditions
         let queryState = await loadQueryState(sessionId);
         if (!queryState) {
@@ -26,13 +33,18 @@ export async function applyInlineFragment(
             console.warn(`[apply-inline-frag] Session not found on first attempt, retrying for ID: ${sessionId}`);
             await new Promise(resolve => setTimeout(resolve, 100)); // 100ms delay
             queryState = await loadQueryState(sessionId);
-            
+
             if (!queryState) {
                 // Include more diagnostic info to help debug session issues
                 console.error(`[apply-inline-frag] Session not found after retry for ID: ${sessionId}`);
-                return {
-                    error: `Session not found. SessionId: "${sessionId}" (length: ${sessionId.length})`
-                };
+                return createErrorResponse(
+                    `Session not found. SessionId: "${sessionId}" (length: ${sessionId.length})`,
+                    {
+                        errorCode: ErrorCode.SESSION_NOT_FOUND,
+                        sessionId,
+                        suggestion: 'Start a new session with start-query-session'
+                    }
+                );
             }
             console.log(`[apply-inline-frag] Session found on retry for ID: ${sessionId}`);
         }
@@ -43,9 +55,15 @@ export async function applyInlineFragment(
             const pathParts = currentPath.split('.');
             for (const part of pathParts) {
                 if (!parentNode.fields || !parentNode.fields[part]) {
-                    return {
-                        error: `Path '${currentPath}' not found in query structure.`
-                    };
+                    return createErrorResponse(
+                        `Path '${currentPath}' not found in query structure.`,
+                        {
+                            errorCode: ErrorCode.VALIDATION_ERROR,
+                            sessionId,
+                            details: { currentPath, missingPart: part },
+                            suggestion: 'Use add-field to create the path first, or verify the path exists'
+                        }
+                    );
                 }
                 parentNode = parentNode.fields[part];
             }
@@ -78,17 +96,28 @@ export async function applyInlineFragment(
         // Save updated query state
         await saveQueryState(sessionId, queryState);
 
-        return {
-            success: true,
-            message: `Inline fragment on type '${onType}' applied at path '${currentPath}' with ${fieldNames.length} fields.`,
-            onType,
-            currentPath: currentPath,
-            fieldNames
-        };
+        return createSuccessResponse(
+            {
+                message: `Inline fragment on type '${onType}' applied at path '${currentPath}' with ${fieldNames.length} fields.`,
+                onType,
+                currentPath: currentPath,
+                fieldNames
+            },
+            {
+                sessionId,
+                stateVersion: queryState.stateVersion,
+                executionTime: Date.now() - startTime
+            }
+        );
     } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : String(error)
-        };
+        return createErrorResponse(
+            error instanceof Error ? error.message : String(error),
+            {
+                errorCode: ErrorCode.INTERNAL_ERROR,
+                sessionId,
+                details: { onType, currentPath, fieldNames }
+            }
+        );
     }
 }
 
@@ -124,12 +153,8 @@ export const applyInlineFragmentTool = {
         const resolvedOnType = (typeName || onType || '').trim();
         const result = await applyInlineFragment(sessionId, currentPath, resolvedOnType, sanitizeInlineFields(fieldNames));
 
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        const { wrapToolResponse } = await import('./shared-utils.js');
+        return wrapToolResponse(result);
     }
 };
 

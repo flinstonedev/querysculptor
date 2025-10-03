@@ -55,23 +55,23 @@ describe('getInputObjectHelp', () => {
         const result = await getInputObjectHelp('TestInput');
 
         expect(result.error).toBeUndefined();
-        expect(result.inputTypeName).toBe('TestInput');
-        expect(result.description).toBe('A test input object.');
-        expect(result.fields).toHaveLength(2);
+        expect(result.data.inputTypeName).toBe('TestInput');
+        expect(result.data.description).toBe('A test input object.');
+        expect(result.data.fields).toHaveLength(2);
 
-        const nameField = result.fields?.find(f => f.name === 'name');
+        const nameField = result.data.fields?.find(f => f.name === 'name');
         expect(nameField).toBeDefined();
         expect(nameField?.type).toBe('String');
         expect(nameField?.required).toBe(false);
         expect(nameField?.exampleValue).toBe('example_string');
 
-        const idField = result.fields?.find(f => f.name === 'id');
+        const idField = result.data.fields?.find(f => f.name === 'id');
         expect(idField).toBeDefined();
         expect(idField?.type).toBe('ID!');
         expect(idField?.required).toBe(true);
         expect(idField?.exampleValue).toBe('example_id');
 
-        expect(result.exampleUsage).toContain('testinput');
+        expect(result.data.exampleUsage).toContain('testinput');
     });
 
     it('should handle non-existent input types', async () => {

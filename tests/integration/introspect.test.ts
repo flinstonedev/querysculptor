@@ -31,7 +31,7 @@ describe('Introspect Schema', () => {
         vi.mocked(sharedUtils.fetchAndCacheSchema).mockResolvedValue(mockSchema);
 
         const result = await introspectGraphQLSchema();
-        expect(result.schemaSdl).toContain('type Query');
+        expect(result.data.schemaSdl).toContain('type Query');
     });
 
     it('should return an error if schema fetching fails', async () => {

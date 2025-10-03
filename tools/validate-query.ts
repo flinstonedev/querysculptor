@@ -1,28 +1,23 @@
 import { z } from "zod";
-import { QueryState, loadQueryState, buildQueryFromStructure, GraphQLValidationUtils, fetchAndCacheSchema, analyzeQueryComplexity } from "./shared-utils.js";
+import { QueryState, loadQueryState, buildQueryFromStructure, GraphQLValidationUtils, fetchAndCacheSchema, analyzeQueryComplexity ,
+    createSuccessResponse,
+    createErrorResponse,
+    ErrorCode
+} from "./shared-utils.js";
 import { parse } from 'graphql';
 
 // Core business logic - testable function
-export async function validateGraphQLQuery(sessionId: string): Promise<{
-    valid?: boolean;
-    errors?: string[];
-    warnings?: string[];
-    query?: string;
-    error?: string;
-    complexity?: {
-        depth: number;
-        fieldCount: number;
-        complexityScore: number;
-        warnings: string[];
-    };
-}> {
+export async function validateGraphQLQuery(sessionId: string) {
+    const startTime = Date.now();
     try {
         // Load query state
         const queryState = await loadQueryState(sessionId);
         if (!queryState) {
-            return {
-                error: 'Session not found.'
-            };
+            return createErrorResponse('Session not found.', {
+                errorCode: ErrorCode.SESSION_NOT_FOUND,
+                sessionId,
+                suggestion: 'Use start-query-session to create a new session'
+            });
         }
 
         // Use comprehensive query structure validation first
@@ -32,18 +27,26 @@ export async function validateGraphQLQuery(sessionId: string): Promise<{
 
             // If query structure validation fails, return early
             if (!validation.valid) {
-                return {
-                    valid: false,
-                    errors: validation.errors,
-                    warnings: validation.warnings,
-                    query: buildQueryFromStructure(
-                        queryState.queryStructure,
-                        queryState.operationType,
-                        queryState.variablesSchema,
-                        queryState.operationName,
-                        queryState.fragments
-                    )
-                };
+                const query = buildQueryFromStructure(
+                    queryState.queryStructure,
+                    queryState.operationType,
+                    queryState.variablesSchema,
+                    queryState.operationName,
+                    queryState.fragments
+                );
+                return createSuccessResponse(
+                    {
+                        valid: false,
+                        errors: validation.errors,
+                        query
+                    },
+                    {
+                        warnings: validation.warnings && validation.warnings.length > 0 ? validation.warnings : undefined,
+                        sessionId,
+                        stateVersion: queryState.stateVersion,
+                        executionTime: Date.now() - startTime
+                    }
+                );
             }
 
             // Build query string for GraphQL validation (include operation directives and variable defaults)
@@ -82,10 +85,33 @@ export async function validateGraphQLQuery(sessionId: string): Promise<{
                     );
                     
                     if (!variableValidation.valid) {
-                        return {
+                        return createSuccessResponse(
+                            {
+                                valid: false,
+                                errors: variableValidation.errors || ['Variable validation failed'],
+                                query: queryString,
+                                complexity: {
+                                    depth: complexityAnalysis.depth,
+                                    fieldCount: complexityAnalysis.fieldCount,
+                                    complexityScore: complexityAnalysis.complexityScore,
+                                    warnings: complexityAnalysis.warnings,
+                                }
+                            },
+                            {
+                                warnings: allWarnings.length > 0 ? allWarnings : undefined,
+                                sessionId,
+                                stateVersion: queryState.stateVersion,
+                                executionTime: Date.now() - startTime
+                            }
+                        );
+                    }
+                } catch (parseError) {
+                    // If parsing fails, the graphqlValidation above should have caught it
+                    // This is a fallback for variable-specific parsing issues
+                    return createSuccessResponse(
+                        {
                             valid: false,
-                            errors: variableValidation.errors || ['Variable validation failed'],
-                            warnings: allWarnings,
+                            errors: [`Variable validation parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`],
                             query: queryString,
                             complexity: {
                                 depth: complexityAnalysis.depth,
@@ -93,15 +119,22 @@ export async function validateGraphQLQuery(sessionId: string): Promise<{
                                 complexityScore: complexityAnalysis.complexityScore,
                                 warnings: complexityAnalysis.warnings,
                             }
-                        };
-                    }
-                } catch (parseError) {
-                    // If parsing fails, the graphqlValidation above should have caught it
-                    // This is a fallback for variable-specific parsing issues
-                    return {
+                        },
+                        {
+                            warnings: allWarnings.length > 0 ? allWarnings : undefined,
+                            sessionId,
+                            stateVersion: queryState.stateVersion,
+                            executionTime: Date.now() - startTime
+                        }
+                    );
+                }
+            }
+
+            if (!graphqlValidation.valid) {
+                return createSuccessResponse(
+                    {
                         valid: false,
-                        errors: [`Variable validation parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`],
-                        warnings: allWarnings,
+                        errors: graphqlValidation.errors || ['Unknown validation error'],
                         query: queryString,
                         complexity: {
                             depth: complexityAnalysis.depth,
@@ -109,15 +142,20 @@ export async function validateGraphQLQuery(sessionId: string): Promise<{
                             complexityScore: complexityAnalysis.complexityScore,
                             warnings: complexityAnalysis.warnings,
                         }
-                    };
-                }
+                    },
+                    {
+                        warnings: allWarnings.length > 0 ? allWarnings : undefined,
+                        sessionId,
+                        stateVersion: queryState.stateVersion,
+                        executionTime: Date.now() - startTime
+                    }
+                );
             }
 
-            if (!graphqlValidation.valid) {
-                return {
-                    valid: false,
-                    errors: graphqlValidation.errors || ['Unknown validation error'],
-                    warnings: allWarnings,
+            return createSuccessResponse(
+                {
+                    valid: true,
+                    errors: [],
                     query: queryString,
                     complexity: {
                         depth: complexityAnalysis.depth,
@@ -125,40 +163,42 @@ export async function validateGraphQLQuery(sessionId: string): Promise<{
                         complexityScore: complexityAnalysis.complexityScore,
                         warnings: complexityAnalysis.warnings,
                     }
-                };
-            }
-
-            return {
-                valid: true,
-                errors: [],
-                warnings: allWarnings,
-                query: queryString,
-                complexity: {
-                    depth: complexityAnalysis.depth,
-                    fieldCount: complexityAnalysis.fieldCount,
-                    complexityScore: complexityAnalysis.complexityScore,
-                    warnings: complexityAnalysis.warnings,
+                },
+                {
+                    warnings: allWarnings.length > 0 ? allWarnings : undefined,
+                    sessionId,
+                    stateVersion: queryState.stateVersion,
+                    executionTime: Date.now() - startTime
                 }
-            };
+            );
         } catch (schemaError) {
-            return {
-                valid: false,
-                errors: [`Schema validation failed: ${schemaError instanceof Error ? schemaError.message : String(schemaError)}`],
-                query: buildQueryFromStructure(
-                    queryState.queryStructure,
-                    queryState.operationType,
-                    queryState.variablesSchema,
-                    queryState.operationName,
-                    queryState.fragments,
-                    queryState.operationDirectives,
-                    queryState.variablesDefaults
-                )
-            };
+            const query = buildQueryFromStructure(
+                queryState.queryStructure,
+                queryState.operationType,
+                queryState.variablesSchema,
+                queryState.operationName,
+                queryState.fragments,
+                queryState.operationDirectives,
+                queryState.variablesDefaults
+            );
+            return createErrorResponse(
+                `Schema validation failed: ${schemaError instanceof Error ? schemaError.message : String(schemaError)}`,
+                {
+                    errorCode: ErrorCode.SCHEMA_ERROR,
+                    sessionId,
+                    suggestion: 'Check if the schema is accessible and the query structure is correct',
+                    details: { query, valid: false }
+                }
+            );
         }
     } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : String(error)
-        };
+        return createErrorResponse(
+            error instanceof Error ? error.message : String(error),
+            {
+                errorCode: ErrorCode.INTERNAL_ERROR,
+                sessionId
+            }
+        );
     }
 }
 
@@ -171,11 +211,7 @@ export const validateQueryTool = {
     handler: async ({ sessionId }: { sessionId: string }) => {
         const result = await validateGraphQLQuery(sessionId);
 
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        const { wrapToolResponse } = await import('./shared-utils.js');
+        return wrapToolResponse(result);
     }
 }; 

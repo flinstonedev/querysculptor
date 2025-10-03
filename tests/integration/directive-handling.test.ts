@@ -61,14 +61,14 @@ describe('Directive Handling', () => {
         const { setFieldDirective } = await import('../../tools/set-field-directive');
         const result = await setFieldDirective('test-session', 'user', 'include', 'if', '$myVar');
         expect(result.success).toBe(true);
-        expect(result.message).toContain("Directive '@include' applied to field at path 'user'");
+        expect(result.data.message).toContain("Directive '@include' applied to field at path 'user'");
     });
 
     it('should set a directive on the operation', async () => {
         const { setOperationDirective } = await import('../../tools/set-operation-directive');
         const result = await setOperationDirective('test-session', 'live');
         expect(result.success).toBe(true);
-        expect(result.message).toContain("Operation directive '@live' applied to query.");
+        expect(result.data.message).toContain("Operation directive '@live' applied to query.");
     });
 
     it('should generate directive with arguments when argument provided', async () => {
@@ -186,9 +186,9 @@ describe('Directive Handling', () => {
 
             expect(result.success).toBe(true);
             expect(result.error).toBeUndefined();
-            expect(result.message).toContain("Directive '@include' applied to field at path 'user'");
-            expect(result.argumentName).toBe('if');
-            expect(result.argumentValue).toBe('$myVar');
+            expect(result.data.message).toContain("Directive '@include' applied to field at path 'user'");
+            expect(result.data.argumentName).toBe('if');
+            expect(result.data.argumentValue).toBe('$myVar');
         });
 
         it('should support directive arguments for @skip directive', async () => {
@@ -203,8 +203,8 @@ describe('Directive Handling', () => {
 
             expect(result.success).toBe(true);
             expect(result.error).toBeUndefined();
-            expect(result.argumentName).toBe('if');
-            expect(result.argumentValue).toBe('$skipStatus');
+            expect(result.data.argumentName).toBe('if');
+            expect(result.data.argumentValue).toBe('$skipStatus');
         });
 
         it('should support boolean literal values for directive arguments', async () => {
@@ -219,8 +219,8 @@ describe('Directive Handling', () => {
 
             expect(result.success).toBe(true);
             expect(result.error).toBeUndefined();
-            expect(result.argumentName).toBe('if');
-            expect(result.argumentValue).toBe(true);
+            expect(result.data.argumentName).toBe('if');
+            expect(result.data.argumentValue).toBe(true);
         });
 
         it('should support string literal values for directive arguments', async () => {
@@ -235,8 +235,8 @@ describe('Directive Handling', () => {
 
             expect(result.success).toBe(true);
             expect(result.error).toBeUndefined();
-            expect(result.argumentName).toBe('reason');
-            expect(result.argumentValue).toBe('Use newField instead');
+            expect(result.data.argumentName).toBe('reason');
+            expect(result.data.argumentValue).toBe('Use newField instead');
         });
     });
 });

@@ -143,21 +143,22 @@ describe('Field Selection', () => {
     it('should select a field to add to the query', async () => {
         const { selectGraphQLField } = await import('../../tools/select-field');
         const result = await selectGraphQLField('test-session', 'user', 'id');
-        expect(result.message).toContain("Field 'id' selected successfully at path 'user'");
+        expect(result.data.message).toContain("Field 'id' selected successfully");
+        expect(result.data.currentPath).toBe('user');
     });
 
     it('should select multiple fields to add to the query', async () => {
         const { selectMultipleFields } = await import('../../tools/select-multiple-fields');
         const result = await selectMultipleFields('test-session', 'user', ['id', 'name']);
         expect(result.success).toBe(true);
-        expect(result.message).toContain("Successfully selected 2 fields at path 'user'");
+        expect(result.data.message).toContain("Successfully selected 2 fields at path 'user'");
     });
 
     it('should get available selections', async () => {
         const { getAvailableSelections } = await import('../../tools/get-selections');
         const result = await getAvailableSelections('test-session', 'user');
         expect(result.error).toBeUndefined();
-        expect(result.selections).toBeDefined();
+        expect(result.data.selections).toBeDefined();
     });
 
     it('should correctly build a query with an aliased field', async () => {
@@ -221,7 +222,7 @@ describe('Get Selections - Enhanced Coverage', () => {
         const result = await getAvailableSelections('test-session', '');
 
         expect(result.error).toBeUndefined();
-        expect(result.selections).toBeDefined();
+        expect(result.data.selections).toBeDefined();
     });
 
     it('should get selections for nested field paths', async () => {
@@ -255,7 +256,7 @@ describe('Get Selections - Enhanced Coverage', () => {
         const result = await getAvailableSelections('test-session', 'user.posts');
 
         expect(result.error).toBeUndefined();
-        expect(result.selections).toBeDefined();
+        expect(result.data.selections).toBeDefined();
     });
 
     it('should return selections with field arguments information', async () => {
@@ -285,9 +286,9 @@ describe('Get Selections - Enhanced Coverage', () => {
         const result = await getAvailableSelections('test-session', 'user');
 
         expect(result.error).toBeUndefined();
-        expect(result.selections).toBeDefined();
+        expect(result.data.selections).toBeDefined();
 
-        const postsSelection = result.selections?.find(s => s.name === 'posts');
+        const postsSelection = result.data.selections?.find(s => s.name === 'posts');
         if (postsSelection) {
             expect(postsSelection.description).toContain('Args:');
             expect(postsSelection.description).toContain('limit');
@@ -325,9 +326,9 @@ describe('Get Selections - Enhanced Coverage', () => {
         const result = await getAvailableSelections('test-session', 'node');
 
         expect(result.error).toBeUndefined();
-        expect(result.selections).toBeDefined();
+        expect(result.data.selections).toBeDefined();
 
-        const inlineFragments = result.selections?.filter(s => s.name.startsWith('... on'));
+        const inlineFragments = result.data.selections?.filter(s => s.name.startsWith('... on'));
         expect(inlineFragments?.length).toBeGreaterThan(0);
     });
 
@@ -336,7 +337,7 @@ describe('Get Selections - Enhanced Coverage', () => {
         const result = await getAvailableSelections('test-session', 'nonexistent.path');
 
         expect(result.error).toContain("Path 'nonexistent.path' not found in query structure");
-        expect(result.selections).toBeUndefined();
+        expect(result.data).toBeUndefined();
     });
 
     it('should return error for non-existent field in path', async () => {
@@ -357,7 +358,7 @@ describe('Get Selections - Enhanced Coverage', () => {
         const result = await getAvailableSelections('test-session', 'user.invalidField');
 
         expect(result.error).toContain("Path 'user.invalidField' not found in query structure");
-        expect(result.selections).toBeUndefined();
+        expect(result.data).toBeUndefined();
     });
 
     it('should return error for non-existent session', async () => {
@@ -367,7 +368,7 @@ describe('Get Selections - Enhanced Coverage', () => {
         const result = await getAvailableSelections('non-existent-session', '');
 
         expect(result.error).toBe('Session not found.');
-        expect(result.selections).toBeUndefined();
+        expect(result.data).toBeUndefined();
     });
 
     it('should handle complex nested paths with multiple levels', async () => {
@@ -396,7 +397,7 @@ describe('Get Selections - Enhanced Coverage', () => {
         const result = await getAvailableSelections('test-session', 'user.posts.author');
 
         expect(result.error).toBeUndefined();
-        expect(result.selections).toBeDefined();
+        expect(result.data.selections).toBeDefined();
     });
 
     it('should include field descriptions and return types in selections', async () => {
@@ -417,9 +418,9 @@ describe('Get Selections - Enhanced Coverage', () => {
         const result = await getAvailableSelections('test-session', 'user');
 
         expect(result.error).toBeUndefined();
-        expect(result.selections).toBeDefined();
+        expect(result.data.selections).toBeDefined();
 
-        const idSelection = result.selections?.find(s => s.name === 'id');
+        const idSelection = result.data.selections?.find(s => s.name === 'id');
         if (idSelection) {
             expect(idSelection.type).toBe('ID');
             expect(idSelection.description).toContain('Returns ID');
@@ -436,12 +437,12 @@ describe('Field Selection - Error Handling', () => {
     it('should return an error for an invalid parent path', async () => {
         const { selectGraphQLField } = await import('../../tools/select-field');
         const result = await selectGraphQLField('test-session', 'invalid.path', 'id');
-        expect(result.error).toContain("Path 'invalid.path' not found in query structure.");
+        expect(result.error).toContain("Path 'invalid.path' not found in query structure");
     });
 
     it('should return an error for an invalid field name', async () => {
         const { selectGraphQLField } = await import('../../tools/select-field');
-        const result = await selectGraphQLField('test-session', 'user', 'invalid-name!', undefined, false);
-        expect(result.error).toContain('Invalid field name "invalid-name!". Must match /^[_A-Za-z][_0-9A-Za-z]*$/');
+        const result = await selectGraphQLField('test-session', 'user', 'invalid-name!');
+        expect(result.error).toContain('Invalid field name "invalid-name!"');
     });
 }); 

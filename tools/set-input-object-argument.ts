@@ -4,7 +4,10 @@ import {
     saveQueryState,
     GraphQLValidationUtils,
     fetchAndCacheSchema,
-    validateInputComplexity
+    validateInputComplexity,
+    createSuccessResponse,
+    createErrorResponse,
+    ErrorCode
 } from "./shared-utils.js";
 import { getNamedType, isInputObjectType, isNonNullType, isListType, GraphQLInputType } from 'graphql';
 
@@ -35,17 +38,28 @@ export async function setInputObjectArgument(
     objectPath: string,
     value: any
 ) {
+    const startTime = Date.now();
     try {
         // --- Input Validation ---
         const complexityError = validateInputComplexity(value, `input object argument "${argumentName}"`);
         if (complexityError) {
-            return { error: complexityError };
+            return createErrorResponse(complexityError, {
+                errorCode: ErrorCode.VALIDATION_ERROR,
+                sessionId,
+                path: currentPath,
+                suggestion: 'Reduce the complexity of the input object value'
+            });
         }
         // --- End Input Validation ---
 
         const queryState = await loadQueryState(sessionId);
         if (!queryState) {
-            return { error: 'Session not found.' };
+            return createErrorResponse('Session not found.', {
+                errorCode: ErrorCode.SESSION_NOT_FOUND,
+                sessionId,
+                path: currentPath,
+                suggestion: 'Start a new session with start-query-session'
+            });
         }
 
         let fieldNode = queryState.queryStructure;
@@ -53,7 +67,15 @@ export async function setInputObjectArgument(
             const pathParts = currentPath.split('.');
             for (const part of pathParts) {
                 if (!fieldNode.fields || !fieldNode.fields[part]) {
-                    return { error: `Field at path '${currentPath}' not found.` };
+                    return createErrorResponse(
+                        `Field at path '${currentPath}' not found.`,
+                        {
+                            errorCode: ErrorCode.FIELD_ERROR,
+                            sessionId,
+                            path: currentPath,
+                            suggestion: 'Verify the field exists using get-selections'
+                        }
+                    );
                 }
                 fieldNode = fieldNode.fields[part];
             }
@@ -66,9 +88,15 @@ export async function setInputObjectArgument(
         // Check if the argument is a variable reference
         const existingArg = (fieldNode as any).args[argumentName];
         if (existingArg && typeof existingArg === 'string' && existingArg.startsWith('$')) {
-            return {
-                error: `Cannot set input object properties on variable argument '${argumentName}'. The argument is currently set to variable '${existingArg}'. Remove the variable first or use a different approach.`
-            };
+            return createErrorResponse(
+                `Cannot set input object properties on variable argument '${argumentName}'. The argument is currently set to variable '${existingArg}'. Remove the variable first or use a different approach.`,
+                {
+                    errorCode: ErrorCode.ARGUMENT_ERROR,
+                    sessionId,
+                    path: currentPath,
+                    suggestion: 'Remove the variable first or use set-variable-argument instead'
+                }
+            );
         }
 
         // Schema-aware validation: ensure the argument exists and is an input object, and that objectPath is valid
@@ -88,7 +116,15 @@ export async function setInputObjectArgument(
                 const fields: any = currentType.getFields();
                 const field = fields[part];
                 if (!field) {
-                    return { error: `Field '${part}' not found in schema for path '${currentPath}'.` };
+                    return createErrorResponse(
+                        `Field '${part}' not found in schema for path '${currentPath}'.`,
+                        {
+                            errorCode: ErrorCode.FIELD_ERROR,
+                            sessionId,
+                            path: currentPath,
+                            suggestion: 'Verify the field path using introspect-field'
+                        }
+                    );
                 }
                 currentType = getNamedType(field.type);
             }
@@ -98,7 +134,15 @@ export async function setInputObjectArgument(
             const fieldDef = parts.length > 0 ? fields[lastKey] : null;
             const argType: GraphQLInputType | null = GraphQLValidationUtils.getArgumentType(schema, currentPath, argumentName);
             if (!argType) {
-                return { error: `Argument '${argumentName}' not found on field '${currentPath || 'root'}'.` };
+                return createErrorResponse(
+                    `Argument '${argumentName}' not found on field '${currentPath || 'root'}'.`,
+                    {
+                        errorCode: ErrorCode.ARGUMENT_ERROR,
+                        sessionId,
+                        path: currentPath,
+                        suggestion: 'Verify the argument exists on the field using introspect-field'
+                    }
+                );
             }
 
             // Unwrap NonNull/List to get base input type for structural validation
@@ -111,7 +155,15 @@ export async function setInputObjectArgument(
             };
             const baseArgType: any = unwrapInputType(argType);
             if (!isInputObjectType(baseArgType)) {
-                return { error: `Argument '${argumentName}' is not an input object; cannot set nested path '${objectPath}'.` };
+                return createErrorResponse(
+                    `Argument '${argumentName}' is not an input object; cannot set nested path '${objectPath}'.`,
+                    {
+                        errorCode: ErrorCode.ARGUMENT_ERROR,
+                        sessionId,
+                        path: currentPath,
+                        suggestion: 'Use set-string-argument or set-variable-argument for non-object arguments'
+                    }
+                );
             }
 
             // Validate objectPath against input object fields
@@ -122,24 +174,56 @@ export async function setInputObjectArgument(
                 const fieldsMap = currentInputType.getFields();
                 const fieldEntry = fieldsMap[seg];
                 if (!fieldEntry) {
-                    return { error: `Path segment '${seg}' not found in input type '${currentInputType.name}'.` };
+                    return createErrorResponse(
+                        `Path segment '${seg}' not found in input type '${currentInputType.name}'.`,
+                        {
+                            errorCode: ErrorCode.ARGUMENT_ERROR,
+                            sessionId,
+                            path: currentPath,
+                            suggestion: 'Verify the object path structure using introspect-type'
+                        }
+                    );
                 }
                 const nextType = unwrapInputType(fieldEntry.type);
                 if (i < pathSegments.length - 1) {
                     if (!isInputObjectType(nextType)) {
-                        return { error: `Path '${pathSegments.slice(0, i + 1).join('.')}' is not an input object.` };
+                        return createErrorResponse(
+                            `Path '${pathSegments.slice(0, i + 1).join('.')}' is not an input object.`,
+                            {
+                                errorCode: ErrorCode.ARGUMENT_ERROR,
+                                sessionId,
+                                path: currentPath,
+                                suggestion: 'Ensure all path segments except the last are input objects'
+                            }
+                        );
                     }
                     currentInputType = nextType;
                 } else {
                     // Leaf value validation
                     const validationError = GraphQLValidationUtils.validateValueAgainstType(value, fieldEntry.type);
                     if (validationError) {
-                        return { error: `Invalid value for '${objectPath}': ${validationError}` };
+                        return createErrorResponse(
+                            `Invalid value for '${objectPath}': ${validationError}`,
+                            {
+                                errorCode: ErrorCode.VALIDATION_ERROR,
+                                sessionId,
+                                path: currentPath,
+                                suggestion: 'Ensure the value matches the expected type'
+                            }
+                        );
                     }
                 }
             }
         } catch (e: any) {
-            return { error: `Schema validation failed: ${e.message}` };
+            return createErrorResponse(
+                `Schema validation failed: ${e.message}`,
+                {
+                    errorCode: ErrorCode.INTERNAL_ERROR,
+                    sessionId,
+                    path: currentPath,
+                    suggestion: 'Verify the schema is accessible and valid'
+                }
+            );
         }
 
         if (!(fieldNode as any).args[argumentName]) {
@@ -150,13 +234,27 @@ export async function setInputObjectArgument(
 
         await saveQueryState(sessionId, queryState);
 
-        return {
-            success: true,
-            message: `Set '${objectPath}' to '${JSON.stringify(value)}' in input object '${argumentName}' at field '${currentPath}'.`
-        };
+        return createSuccessResponse(
+            {
+                message: `Set '${objectPath}' to '${JSON.stringify(value)}' in input object '${argumentName}' at field '${currentPath}'.`
+            },
+            {
+                sessionId,
+                stateVersion: queryState.stateVersion,
+                executionTime: Date.now() - startTime
+            }
+        );
 
     } catch (error) {
-        return { error: error instanceof Error ? error.message : String(error) };
+        return createErrorResponse(
+            error instanceof Error ? error.message : String(error),
+            {
+                errorCode: ErrorCode.INTERNAL_ERROR,
+                sessionId,
+                path: currentPath,
+                suggestion: 'Check the error message and verify all inputs are correct'
+            }
+        );
     }
 }
 
@@ -190,11 +288,7 @@ export const setInputObjectArgumentTool = {
             objectPath,
             value
         );
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        const { wrapToolResponse } = await import('./shared-utils.js');
+        return wrapToolResponse(result);
     },
 }; 

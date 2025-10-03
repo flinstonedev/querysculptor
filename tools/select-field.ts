@@ -5,7 +5,11 @@ import {
     loadQueryState,
     saveQueryState,
     fetchAndCacheSchema,
-    GraphQLValidationUtils
+    GraphQLValidationUtils,
+    createSuccessResponse,
+    createErrorResponse,
+    wrapToolResponse,
+    ErrorCode
 } from "./shared-utils.js";
 
 // Core business logic - testable function
@@ -14,38 +18,51 @@ export async function selectGraphQLField(
     currentPath: string = "",
     fieldName: string,
     alias?: string
-): Promise<{
-    message?: string;
-    fieldKey?: string;
-    currentPath?: string;
-    error?: string;
-}> {
+) {
+    const startTime = Date.now();
+
     try {
         if (!sessionId || typeof sessionId !== 'string' || sessionId.trim() === '') {
-            return { error: 'Invalid sessionId.' };
+            return createErrorResponse('Invalid sessionId', {
+                errorCode: ErrorCode.VALIDATION_ERROR,
+                suggestion: 'Provide a valid session ID from start-query-session'
+            });
         }
+
         // Validate field alias syntax
         const aliasValidation = GraphQLValidationUtils.validateFieldAlias(alias || null);
         if (!aliasValidation.valid) {
-            return {
-                error: aliasValidation.error || 'Invalid field alias.'
-            };
+            return createErrorResponse(aliasValidation.error || 'Invalid field alias', {
+                errorCode: ErrorCode.FIELD_ERROR,
+                field: fieldName,
+                sessionId
+            });
         }
 
         // Validate field name syntax
         if (!GraphQLValidationUtils.isValidGraphQLName(fieldName)) {
-            return {
-                error: `Invalid field name "${fieldName}". Must match /^[_A-Za-z][_0-9A-Za-z]*$/`
-            };
+            return createErrorResponse(
+                `Invalid field name "${fieldName}"`,
+                {
+                    errorCode: ErrorCode.FIELD_ERROR,
+                    field: fieldName,
+                    suggestion: 'Field names must match /^[_A-Za-z][_0-9A-Za-z]*$/',
+                    sessionId
+                }
+            );
         }
 
         // Load query state
         const queryState = await loadQueryState(sessionId);
         if (!queryState) {
-            return {
-                error: 'Session not found.'
-            };
+            return createErrorResponse('Session not found', {
+                errorCode: ErrorCode.SESSION_NOT_FOUND,
+                suggestion: 'Start a new session with start-query-session',
+                sessionId
+            });
         }
+
+        const warnings: string[] = [];
 
         // Comprehensive incremental validation
         try {
@@ -59,17 +76,26 @@ export async function selectGraphQLField(
             );
 
             if (!validation.valid) {
-                return {
-                    error: validation.error
-                };
+                return createErrorResponse(validation.error || 'Field validation failed', {
+                    errorCode: ErrorCode.VALIDATION_ERROR,
+                    field: fieldName,
+                    path: currentPath,
+                    sessionId
+                });
             }
 
-            // Store any warnings for later reporting
-            const warning = validation.warning;
+            if (validation.warning) {
+                warnings.push(validation.warning);
+            }
         } catch (schemaError) {
-            return {
-                error: `Schema validation failed: ${schemaError instanceof Error ? schemaError.message : String(schemaError)}`
-            };
+            return createErrorResponse(
+                `Schema validation failed: ${schemaError instanceof Error ? schemaError.message : String(schemaError)}`,
+                {
+                    errorCode: ErrorCode.SCHEMA_ERROR,
+                    field: fieldName,
+                    sessionId
+                }
+            );
         }
 
         // Navigate to the current node in the query structure
@@ -78,9 +104,12 @@ export async function selectGraphQLField(
             const pathParts = currentPath.split('.');
             for (const part of pathParts) {
                 if (!parentNode.fields[part]) {
-                    return {
-                        error: `Path '${currentPath}' not found in query structure.`
-                    };
+                    return createErrorResponse(`Path '${currentPath}' not found in query structure`, {
+                        errorCode: ErrorCode.FIELD_ERROR,
+                        path: currentPath,
+                        suggestion: 'Verify the path exists using get-current-query',
+                        sessionId
+                    });
                 }
                 parentNode = parentNode.fields[part]!;
             }
@@ -95,9 +124,16 @@ export async function selectGraphQLField(
 
         // Check for alias conflicts
         if (parentNode.fields[key] && parentNode.fields[key].fieldName !== fieldName) {
-            return {
-                error: `Alias conflict: '${key}' is already used for field '${parentNode.fields[key].fieldName}'. Choose a different alias or field name.`
-            };
+            return createErrorResponse(
+                `Alias conflict: '${key}' is already used for field '${parentNode.fields[key].fieldName}'`,
+                {
+                    errorCode: ErrorCode.FIELD_ERROR,
+                    field: fieldName,
+                    path: currentPath,
+                    suggestion: 'Choose a different alias or field name',
+                    sessionId
+                }
+            );
         }
 
         parentNode.fields[key] = {
@@ -113,15 +149,31 @@ export async function selectGraphQLField(
         // Save updated query state
         await saveQueryState(sessionId, queryState);
 
-        return {
-            message: `Field '${fieldName}' selected successfully at path '${currentPath}'`,
-            fieldKey: key,
-            currentPath: currentPath
-        };
+        return createSuccessResponse(
+            {
+                message: `Field '${fieldName}' selected successfully`,
+                fieldKey: key,
+                currentPath: currentPath,
+                fieldName: fieldName,
+                alias: alias || null
+            },
+            {
+                warnings: warnings.length > 0 ? warnings : undefined,
+                sessionId,
+                stateVersion: queryState.stateVersion,
+                executionTime: Date.now() - startTime
+            }
+        );
     } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : String(error)
-        };
+        return createErrorResponse(
+            error instanceof Error ? error.message : String(error),
+            {
+                errorCode: ErrorCode.INTERNAL_ERROR,
+                field: fieldName,
+                path: currentPath,
+                sessionId
+            }
+        );
     }
 }
 
@@ -141,12 +193,6 @@ export const selectFieldTool = {
         alias?: string
     }) => {
         const result = await selectGraphQLField(sessionId, currentPath, fieldName, alias);
-
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        return wrapToolResponse(result);
     }
 }; 

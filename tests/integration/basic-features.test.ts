@@ -152,24 +152,29 @@ describe('Integration Tests - Complete Query Building Workflow', () => {
 
         // Step 2: Add a root field with selection
         let fieldResult = await selectGraphQLField('integration-test-session', '', 'user');
-        expect(fieldResult.message).toContain("Field 'user' selected successfully");
+        expect(fieldResult.data.message).toContain("Field 'user' selected successfully");
 
         // Step 3: Add nested fields
         fieldResult = await selectGraphQLField('integration-test-session', 'user', 'id');
-        expect(fieldResult.message).toContain("Field 'id' selected successfully at path 'user'");
+        expect(fieldResult.data.message).toContain("Field 'id' selected successfully");
+        expect(fieldResult.data.currentPath).toBe('user');
 
         fieldResult = await selectGraphQLField('integration-test-session', 'user', 'name');
-        expect(fieldResult.message).toContain("Field 'name' selected successfully at path 'user'");
+        expect(fieldResult.data.message).toContain("Field 'name' selected successfully");
+        expect(fieldResult.data.currentPath).toBe('user');
 
         fieldResult = await selectGraphQLField('integration-test-session', 'user', 'posts');
-        expect(fieldResult.message).toContain("Field 'posts' selected successfully at path 'user'");
+        expect(fieldResult.data.message).toContain("Field 'posts' selected successfully");
+        expect(fieldResult.data.currentPath).toBe('user');
 
         // Step 4: Add fields to the nested posts
         fieldResult = await selectGraphQLField('integration-test-session', 'user.posts', 'id');
-        expect(fieldResult.message).toContain("Field 'id' selected successfully at path 'user.posts'");
+        expect(fieldResult.data.message).toContain("Field 'id' selected successfully");
+        expect(fieldResult.data.currentPath).toBe('user.posts');
 
         fieldResult = await selectGraphQLField('integration-test-session', 'user.posts', 'title');
-        expect(fieldResult.message).toContain("Field 'title' selected successfully at path 'user.posts'");
+        expect(fieldResult.data.message).toContain("Field 'title' selected successfully");
+        expect(fieldResult.data.currentPath).toBe('user.posts');
 
         // Step 5: Add query variables
         const variableResult = await setQueryVariable(
@@ -179,7 +184,7 @@ describe('Integration Tests - Complete Query Building Workflow', () => {
             undefined
         );
         expect(variableResult.success).toBe(true);
-        expect(variableResult.message).toContain("Variable '$userId' set to type 'ID!'");
+        expect(variableResult.data.message).toContain("Variable '$userId' set to type 'ID!'");
 
         // Step 6: Set variable argument on the user field
         const argResult = await setVariableArgument(
@@ -189,19 +194,19 @@ describe('Integration Tests - Complete Query Building Workflow', () => {
             '$userId'
         );
         expect(argResult.success).toBe(true);
-        expect(argResult.message).toContain("Variable argument 'id' set to $userId at path 'user'");
+        expect(argResult.data.message).toContain("Variable argument 'id' set to $userId at path 'user'");
 
         // Step 7: Get current query to verify structure
         const currentQueryResult = await getCurrentQuery('integration-test-session');
-        expect(currentQueryResult.queryString).toBeDefined();
-        expect(currentQueryResult.queryString).toContain('query GetUserWithPosts($userId: ID!)');
-        expect(currentQueryResult.queryString).toContain('user(id: $userId)');
-        expect(currentQueryResult.queryString).toContain('posts');
-        expect(currentQueryResult.variables_schema).toEqual({ '$userId': 'ID!' });
+        expect(currentQueryResult.data.queryString).toBeDefined();
+        expect(currentQueryResult.data.queryString).toContain('query GetUserWithPosts($userId: ID!)');
+        expect(currentQueryResult.data.queryString).toContain('user(id: $userId)');
+        expect(currentQueryResult.data.queryString).toContain('posts');
+        expect(currentQueryResult.data.variables_schema).toEqual({ '$userId': 'ID!' });
 
         // Step 8: Validate the query
         const validationResult = await validateGraphQLQuery('integration-test-session');
-        expect(validationResult.valid).toBe(true);
+        expect(validationResult.data.valid).toBe(true);
 
         // Step 9: Mock successful execution
         vi.spyOn(global, 'fetch').mockResolvedValue({
@@ -222,12 +227,13 @@ describe('Integration Tests - Complete Query Building Workflow', () => {
 
         const executionResult = await executeGraphQLQuery('integration-test-session');
         expect(executionResult.data).toBeDefined();
-        expect((executionResult.data as any).user.name).toBe('John Doe');
-        expect((executionResult.data as any).user.posts).toHaveLength(2);
+        expect(executionResult.data.data).toBeDefined();
+        expect((executionResult.data.data as any).user.name).toBe('John Doe');
+        expect((executionResult.data.data as any).user.posts).toHaveLength(2);
 
         // Step 10: End the session
         const endResult = await endQuerySession('integration-test-session');
-        expect(endResult.message).toContain('ended successfully');
+        expect(endResult.data.message).toContain('ended successfully');
 
         // Verify session is ended
         const afterEndResult = await getCurrentQuery('integration-test-session');
@@ -256,18 +262,18 @@ describe('Integration Tests - Complete Query Building Workflow', () => {
 
         // Verify the complex query
         const queryResult = await getCurrentQuery('integration-test-session');
-        expect(queryResult.queryString).toContain('$limit: Int');
-        expect(queryResult.queryString).toContain('$offset: Int');
-        expect(queryResult.queryString).toContain('users(limit: $limit, offset: $offset)');
-        expect(queryResult.queryString).toContain('avatar');
-        expect(queryResult.variables_schema).toEqual({
+        expect(queryResult.data.queryString).toContain('$limit: Int');
+        expect(queryResult.data.queryString).toContain('$offset: Int');
+        expect(queryResult.data.queryString).toContain('users(limit: $limit, offset: $offset)');
+        expect(queryResult.data.queryString).toContain('avatar');
+        expect(queryResult.data.variables_schema).toEqual({
             '$limit': 'Int',
             '$offset': 'Int'
         });
 
         // Validate complex query
         const validation = await validateGraphQLQuery('integration-test-session');
-        expect(validation.valid).toBe(true);
+        expect(validation.data.valid).toBe(true);
     });
 
     it('should handle error scenarios gracefully in workflow', async () => {
@@ -343,12 +349,12 @@ describe('Integration Tests - Complete Query Building Workflow', () => {
 
         // Verify mutation query
         const queryResult = await getCurrentQuery('integration-test-session');
-        expect(queryResult.queryString).toContain('mutation CreateNewUser($input: CreateUserInput!)');
-        expect(queryResult.queryString).toContain('createUser(input: $input)');
+        expect(queryResult.data.queryString).toContain('mutation CreateNewUser($input: CreateUserInput!)');
+        expect(queryResult.data.queryString).toContain('createUser(input: $input)');
 
         // Validate mutation
         const validation = await validateGraphQLQuery('integration-test-session');
-        expect(validation.valid).toBe(true);
+        expect(validation.data.valid).toBe(true);
     });
 
     it('should handle session lifecycle properly', async () => {
@@ -360,11 +366,11 @@ describe('Integration Tests - Complete Query Building Workflow', () => {
 
         // Get current state
         const currentQuery = await getCurrentQuery('integration-test-session');
-        expect(currentQuery.queryString).toContain('user');
+        expect(currentQuery.data.queryString).toContain('user');
 
         // End session
         const endResult = await endQuerySession('integration-test-session');
-        expect(endResult.message).toContain('ended successfully');
+        expect(endResult.data.message).toContain('ended successfully');
 
         // Verify session is ended
         const afterEndResult = await getCurrentQuery('integration-test-session');
@@ -418,7 +424,7 @@ describe('Integration Tests - Complete Query Building Workflow', () => {
 
         // Step 6: Verify generated query structure
         const currentQuery = await getCurrentQuery('integration-test-session', true);
-        const queryString = currentQuery.queryString;
+        const queryString = currentQuery.data.queryString;
 
         // Verify proper variable argument usage: id: $characterId
         expect(queryString).toContain('id: $characterId');
@@ -430,6 +436,6 @@ describe('Integration Tests - Complete Query Building Workflow', () => {
 
         // Step 7: Validate complete query
         const validation = await validateGraphQLQuery('integration-test-session');
-        expect(validation.valid).toBe(true);
+        expect(validation.data.valid).toBe(true);
     });
 }); 

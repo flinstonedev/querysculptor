@@ -1,36 +1,45 @@
 import { z } from "zod";
-import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils } from "./shared-utils.js";
+import { QueryState, loadQueryState, saveQueryState, GraphQLValidationUtils ,
+    createSuccessResponse,
+    createErrorResponse,
+    ErrorCode
+} from "./shared-utils.js";
 
 // Core business logic - testable function
 export async function removeQueryVariable(
     sessionId: string,
     variableName: string
-): Promise<{
-    success?: boolean;
-    message?: string;
-    variablesSchema?: { [key: string]: string };
-    error?: string;
-}> {
+) {
+    const startTime = Date.now();
+
     try {
         // Validate variable name syntax
         const variableValidation = GraphQLValidationUtils.validateVariableName(variableName);
         if (!variableValidation.valid) {
-            return {
-                error: variableValidation.error || 'Invalid variable name.'
-            };
+            return createErrorResponse(variableValidation.error || 'Invalid variable name.', {
+                errorCode: ErrorCode.VALIDATION_ERROR,
+                sessionId,
+                suggestion: 'Variable name must start with $ and follow GraphQL naming rules (e.g., "$userId")'
+            });
         }
 
         // Load query state
         const queryState = await loadQueryState(sessionId);
         if (!queryState) {
-            return {
-                error: 'Session not found.'
-            };
+            return createErrorResponse('Session not found.', {
+                errorCode: ErrorCode.SESSION_NOT_FOUND,
+                sessionId,
+                suggestion: 'Start a new session with start-query-session'
+            });
         }
 
         // Check if variable exists
         if (!queryState.variablesSchema[variableName]) {
-            return { error: `Variable '${variableName}' not defined.` };
+            return createErrorResponse(`Variable '${variableName}' not defined.`, {
+                errorCode: ErrorCode.VARIABLE_ERROR,
+                sessionId,
+                suggestion: 'Check that the variable name is correct'
+            });
         }
 
         // Remove from all variable-related objects
@@ -153,15 +162,23 @@ export async function removeQueryVariable(
             message += ` Also cleaned up ${cleanupWarnings.length} dependent directive(s): ${cleanupWarnings.join(', ')}`;
         }
 
-        return {
-            success: true,
-            message,
-            variablesSchema: queryState.variablesSchema
-        };
+        return createSuccessResponse(
+            {
+                message,
+                variablesSchema: queryState.variablesSchema
+            },
+            {
+                sessionId,
+                stateVersion: queryState.stateVersion,
+                executionTime: Date.now() - startTime
+            }
+        );
     } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : String(error)
-        };
+        return createErrorResponse(error instanceof Error ? error.message : String(error), {
+            errorCode: ErrorCode.INTERNAL_ERROR,
+            sessionId,
+            suggestion: 'Check the error message for details'
+        });
     }
 }
 
@@ -178,11 +195,7 @@ export const removeQueryVariableTool = {
     }) => {
         const result = await removeQueryVariable(sessionId, variableName);
 
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        const { wrapToolResponse } = await import('./shared-utils.js');
+        return wrapToolResponse(result);
     }
 }; 

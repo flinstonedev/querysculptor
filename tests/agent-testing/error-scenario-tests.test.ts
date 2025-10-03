@@ -67,7 +67,7 @@ describe('Error Scenario Tests', () => {
             // Start a session with a generated ID
             const sessionResponse = await agentClient.callTool('start-query-session');
             expect(sessionResponse.error).toBeUndefined();
-            
+
             const sessionId = sessionResponse.sessionId;
             console.log(`\nGenerated session ID: "${sessionId}"`);
 
@@ -84,7 +84,9 @@ describe('Error Scenario Tests', () => {
                 sessionId
             });
             expect(queryResponse.error).toBeUndefined();
-            expect(queryResponse.queryString).toContain('abilities');
+            const queryString = queryResponse.data.queryString;
+            expect(queryString).toBeDefined();
+            expect(queryString).toContain('abilities');
 
             // Test with slightly modified session ID (this would have failed before the fix)
             const modifiedSessionId = `  ${sessionId}  `; // with whitespace
@@ -329,7 +331,7 @@ describe('Error Scenario Tests', () => {
             // Test with non-existent session
             const analysis1 = await debugHelper.analyzeSessionPersistence('non-existent');
             expect(analysis1.exists).toBe(false);
-            expect(analysis1.issues).toContain('Session not found.');
+            expect(analysis1.issues).toContain('Session not found');
 
             // Test with valid session that has a query
             const sessionId = await agentClient.startSession();

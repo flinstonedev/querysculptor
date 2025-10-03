@@ -315,17 +315,22 @@ export class AgentTestClient {
     }
 
     private validateResponse(response: any, expected: any, toolName: string): void {
-        // Tools return data directly on success or {error: "message"} on failure
-        const isSuccess = !response.error;
-        
+        // Tools can return either:
+        // 1. Wrapped format: { success: true, data: {...}, ... }
+        // 2. Direct format: { sessionId: "...", ... } (for tools like start-query-session)
+        // 3. Error format: { error: "message" }
+
+        // Determine if this is a success based on presence of error field and success field
+        const hasError = !!response.error;
+        const isSuccess = response.success === true || (!hasError && response.success !== false);
+
         if (expected.success !== undefined) {
             if (isSuccess !== expected.success) {
-                throw new Error(`Expected success=${expected.success} but got success=${isSuccess} from ${toolName}`);
+                throw new Error(`Expected success=${expected.success} but got success=${isSuccess} from ${toolName}. Response: ${JSON.stringify(response).substring(0, 200)}`);
             }
         }
 
         if (expected.error !== undefined) {
-            const hasError = !!response.error;
             if (typeof expected.error === 'string') {
                 if (!hasError || response.error !== expected.error) {
                     throw new Error(`Expected error "${expected.error}" but got "${response.error}" from ${toolName}`);
@@ -342,22 +347,25 @@ export class AgentTestClient {
         }
 
         if (expected.warning !== undefined) {
-            const hasWarning = !!response.warning;
+            const hasWarning = !!response.warning || !!response.warnings;
+            const warning = response.warning || (response.warnings && response.warnings.join(', '));
             if (typeof expected.warning === 'string') {
-                if (!hasWarning || response.warning !== expected.warning) {
-                    throw new Error(`Expected warning "${expected.warning}" but got "${response.warning}" from ${toolName}`);
+                if (!hasWarning || warning !== expected.warning) {
+                    throw new Error(`Expected warning "${expected.warning}" but got "${warning}" from ${toolName}`);
                 }
             } else if (expected.warning instanceof RegExp) {
-                if (!hasWarning || !expected.warning.test(response.warning)) {
-                    throw new Error(`Expected warning matching ${expected.warning} but got "${response.warning}" from ${toolName}`);
+                if (!hasWarning || !expected.warning.test(warning)) {
+                    throw new Error(`Expected warning matching ${expected.warning} but got "${warning}" from ${toolName}`);
                 }
             }
         }
 
         if (expected.fields && Array.isArray(expected.fields) && isSuccess) {
             for (const field of expected.fields) {
-                if (!(field in response)) {
-                    throw new Error(`Expected field "${field}" missing from ${toolName} response`);
+                // Check both top-level and in data field for wrapped responses
+                const hasField = (field in response) || (response.data && field in response.data);
+                if (!hasField) {
+                    throw new Error(`Expected field "${field}" missing from ${toolName} response. Available fields: ${Object.keys(response).join(', ')}${response.data ? ` (data: ${Object.keys(response.data).join(', ')})` : ''}`);
                 }
             }
         }

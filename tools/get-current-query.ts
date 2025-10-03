@@ -1,22 +1,33 @@
 import { z } from "zod";
-import { QueryState, loadQueryState, buildQueryFromStructure } from "./shared-utils.js";
+import {
+    QueryState,
+    loadQueryState,
+    buildQueryFromStructure,
+    createSuccessResponse,
+    createErrorResponse,
+    ErrorCode
+} from "./shared-utils.js";
 
 // Core business logic - testable function
-export async function getCurrentQuery(sessionId: string, prettyPrint: boolean = false): Promise<{
-    queryString?: string;
-    variables_schema?: Record<string, string>;
-    error?: string;
-}> {
+export async function getCurrentQuery(sessionId: string, prettyPrint: boolean = false) {
+    const startTime = Date.now();
+
     try {
         if (!sessionId || typeof sessionId !== 'string' || sessionId.trim() === '') {
-            return { error: 'Invalid sessionId.' };
+            return createErrorResponse('Invalid sessionId', {
+                errorCode: ErrorCode.VALIDATION_ERROR,
+                sessionId
+            });
         }
+
         // Load query state
         const queryState = await loadQueryState(sessionId);
         if (!queryState) {
-            return {
-                error: 'Session not found.'
-            };
+            return createErrorResponse('Session not found', {
+                errorCode: ErrorCode.SESSION_NOT_FOUND,
+                sessionId,
+                suggestion: 'Start a new session with start-query-session'
+            });
         }
 
         const queryString = buildQueryFromStructure(
@@ -47,20 +58,26 @@ export async function getCurrentQuery(sessionId: string, prettyPrint: boolean = 
             console.warn('Required argument validation failed:', error);
         }
 
-        const result: any = {
-            queryString: queryString,
-            variables_schema: queryState.variablesSchema
-        };
-
-        if (warnings.length > 0) {
-            result.warnings = warnings;
-        }
-
-        return result;
+        return createSuccessResponse(
+            {
+                queryString,
+                variables_schema: queryState.variablesSchema
+            },
+            {
+                warnings: warnings.length > 0 ? warnings : undefined,
+                sessionId,
+                stateVersion: queryState.stateVersion,
+                executionTime: Date.now() - startTime
+            }
+        );
     } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : String(error)
-        };
+        return createErrorResponse(
+            error instanceof Error ? error.message : String(error),
+            {
+                errorCode: ErrorCode.INTERNAL_ERROR,
+                sessionId
+            }
+        );
     }
 }
 
@@ -76,11 +93,7 @@ export const getCurrentQueryTool = {
     handler: async ({ sessionId, prettyPrint = false }: { sessionId: string, prettyPrint?: boolean }) => {
         const result = await getCurrentQuery(sessionId, prettyPrint);
 
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        const { wrapToolResponse } = await import('./shared-utils.js');
+        return wrapToolResponse(result);
     }
 }; 

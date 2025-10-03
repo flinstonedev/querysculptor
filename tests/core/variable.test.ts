@@ -29,14 +29,14 @@ describe('Variable Management', () => {
         const { setQueryVariable } = await import('../../tools/set-query-variable');
         const result = await setQueryVariable('test-session', '$userId', 'String!');
         expect(result.success).toBe(true);
-        expect(result.message).toContain("Variable '$userId' set to type 'String!'");
+        expect(result.data.message).toContain("Variable '$userId' set to type 'String!'");
     });
 
     it('should set a variable value', async () => {
         const { setVariableValue } = await import('../../tools/set-variable-value');
         const result = await setVariableValue('test-session', '$userId', '123');
         expect(result.success).toBe(true);
-        expect(result.message).toContain("Variable '$userId' value set to \"123\".");
+        expect(result.data.message).toContain("Variable '$userId' value set to \"123\".");
     });
 
     describe('Variable Value Type Validation', () => {
@@ -125,7 +125,7 @@ describe('Variable Management', () => {
         const { removeQueryVariable } = await import('../../tools/remove-query-variable');
         const result = await removeQueryVariable('test-session', '$userId');
         expect(result.success).toBe(true);
-        expect(result.message).toContain("Variable '$userId' removed from query.");
+        expect(result.data.message).toContain("Variable '$userId' removed from query.");
     });
 });
 

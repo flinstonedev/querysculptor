@@ -9,23 +9,27 @@ import {
     isListType,
     getNamedType
 } from 'graphql';
-import { QueryState, loadQueryState, fetchAndCacheSchema, getTypeNameStr } from "./shared-utils.js";
+import { QueryState, loadQueryState, fetchAndCacheSchema, getTypeNameStr ,
+    createSuccessResponse,
+    createErrorResponse,
+    ErrorCode
+} from "./shared-utils.js";
 
 // Core business logic - testable function
 export async function getAvailableSelections(
     sessionId: string,
     currentPath: string = ""
-): Promise<{
-    selections?: any[];
-    error?: string;
-}> {
+) {
+    const startTime = Date.now();
     try {
         // Load query state
         const queryState = await loadQueryState(sessionId);
         if (!queryState) {
-            return {
-                error: 'Session not found.'
-            };
+            return createErrorResponse('Session not found.', {
+                errorCode: ErrorCode.SESSION_NOT_FOUND,
+                sessionId,
+                suggestion: 'Use start-query-session to create a new session'
+            });
         }
 
         // Get schema from cache
@@ -41,9 +45,12 @@ export async function getAvailableSelections(
             for (const part of pathParts) {
                 // Navigate through the query structure
                 if (!currentQueryNode.fields[part]) {
-                    return {
-                        error: `Path '${currentPath}' not found in query structure`
-                    };
+                    return createErrorResponse(`Path '${currentPath}' not found in query structure`, {
+                        errorCode: ErrorCode.FIELD_ERROR,
+                        sessionId,
+                        path: currentPath,
+                        suggestion: 'Verify the path exists using get-current-query'
+                    });
                 }
 
                 // Get the field type from schema
@@ -56,9 +63,12 @@ export async function getAvailableSelections(
                     const fields: any = unwrappedType.getFields();
                     const field: any = fields[part];
                     if (!field) {
-                        return {
-                            error: `Field '${part}' not found on type '${unwrappedType.name}'`
-                        };
+                        return createErrorResponse(`Field '${part}' not found on type '${unwrappedType.name}'`, {
+                            errorCode: ErrorCode.FIELD_ERROR,
+                            sessionId,
+                            path: currentPath,
+                            suggestion: `Use get-selections to see available fields on type '${unwrappedType.name}'`
+                        });
                     }
                     currentType = field.type;
                 }
@@ -123,13 +133,23 @@ export async function getAvailableSelections(
             });
         }
 
-        return {
-            selections
-        };
+        return createSuccessResponse(
+            { selections },
+            {
+                sessionId,
+                stateVersion: queryState.stateVersion,
+                executionTime: Date.now() - startTime
+            }
+        );
     } catch (error) {
-        return {
-            error: error instanceof Error ? error.message : String(error)
-        };
+        return createErrorResponse(
+            error instanceof Error ? error.message : String(error),
+            {
+                errorCode: ErrorCode.INTERNAL_ERROR,
+                sessionId,
+                path: currentPath
+            }
+        );
     }
 }
 
@@ -143,11 +163,7 @@ export const getSelectionsTool = {
     handler: async ({ sessionId, currentPath }: { sessionId: string, currentPath?: string }) => {
         const result = await getAvailableSelections(sessionId, currentPath || "");
 
-        return {
-            content: [{
-                type: "text",
-                text: JSON.stringify(result, null, 2)
-            }],
-        };
+        const { wrapToolResponse } = await import('./shared-utils.js');
+        return wrapToolResponse(result);
     }
 }; 
