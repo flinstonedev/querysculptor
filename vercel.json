@@ -1,4 +1,5 @@
 {
+  "buildCommand": "node scripts/inject-env.js",
   "rewrites": [
     {
       "source": "/mcp",

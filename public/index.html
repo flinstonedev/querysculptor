@@ -42,6 +42,20 @@
             }
         }
     </script>
+    <script>
+        // Check if user has opted out of analytics
+        const analyticsOptedOut = localStorage.getItem('querysculptor-analytics-opted-out') === 'true';
+
+        if (!analyticsOptedOut) {
+            // Only initialize PostHog if user hasn't opted out
+            !function(t,e){var o,n,p,r;e.__SV||(window.posthog && window.posthog.__loaded)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="init hi $r kr ui wr Er capture Ri calculateEventProperties Ir register register_once register_for_session unregister unregister_for_session Fr getFeatureFlag getFeatureFlagPayload isFeatureEnabled reloadFeatureFlags updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures on onFeatureFlags onSurveysLoaded onSessionId getSurveys getActiveMatchingSurveys renderSurvey displaySurvey canRenderSurvey canRenderSurveyAsync identify setPersonProperties group resetGroups setPersonPropertiesForFlags resetPersonPropertiesForFlags setGroupPropertiesForFlags resetGroupPropertiesForFlags reset get_distinct_id getGroups get_session_id get_session_replay_url alias set_config startSessionRecording stopSessionRecording sessionRecordingStarted captureException loadToolbar get_property getSessionProperty Cr Tr createPersonProfile Or yr Mr opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing get_explicit_consent_status is_capturing clear_opt_in_out_capturing Pr debug L Rr getPageViewId captureTraceFeedback captureTraceMetric gr".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+            posthog.init('__POSTHOG_API_KEY__', {
+                api_host: '__POSTHOG_API_HOST__',
+                defaults: '2025-05-24',
+                person_profiles: 'identified_only'
+            })
+        }
+    </script>
 </head>
 
 <body class="min-h-screen bg-gradient-to-br from-dark-950 via-dark-900 to-dark-850 text-gray-100">
@@ -273,7 +287,56 @@
         </section>
     </div>
 
+    <!-- GDPR Cookie Consent Banner -->
+    <div id="analytics-banner" class="fixed bottom-0 left-0 right-0 bg-dark-900 border-t border-gray-800 shadow-2xl z-50">
+        <div class="container mx-auto px-4 py-6 max-w-6xl">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                <div class="flex-1">
+                    <h3 class="text-sm font-semibold text-gray-100 mb-2">Analytics & Tracking</h3>
+                    <p class="text-xs md:text-sm text-gray-400 leading-relaxed">
+                        We use analytics to understand how you interact with this site and improve our service. We do <strong>not</strong> collect or store any personal user data. Your interactions are recorded anonymously to help us optimize your experience.
+                    </p>
+                </div>
+                <div class="flex gap-3 flex-shrink-0">
+                    <button onclick="acceptAnalytics()" class="px-6 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 border border-blue-500 hover:border-blue-400 whitespace-nowrap">
+                        Accept Analytics
+                    </button>
+                    <button onclick="declineAnalytics()" class="px-6 py-2 rounded-lg text-sm font-semibold bg-gray-800 hover:bg-gray-700 text-gray-300 transition-all duration-200 border border-gray-700 hover:border-gray-600 whitespace-nowrap">
+                        Decline
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // Analytics consent management
+        function acceptAnalytics() {
+            localStorage.setItem('querysculptor-analytics-opted-out', 'false');
+            document.getElementById('analytics-banner').style.display = 'none';
+            // Reload to initialize PostHog if not already loaded
+            if (!window.posthog) {
+                location.reload();
+            }
+        }
+
+        function declineAnalytics() {
+            localStorage.setItem('querysculptor-analytics-opted-out', 'true');
+            document.getElementById('analytics-banner').style.display = 'none';
+            // Ensure PostHog is not tracking
+            if (window.posthog) {
+                window.posthog.opt_out_capturing();
+            }
+        }
+
+        // Show banner only if user hasn't made a choice yet
+        document.addEventListener('DOMContentLoaded', function () {
+            const hasConsented = localStorage.getItem('querysculptor-analytics-opted-out');
+            if (hasConsented !== null) {
+                document.getElementById('analytics-banner').style.display = 'none';
+            }
+        });
+
         // Copy to clipboard functionality
         function copyToClipboard(elementId) {
             const element = document.getElementById(elementId);
