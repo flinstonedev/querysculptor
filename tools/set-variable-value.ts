@@ -75,7 +75,7 @@ export async function setVariableValue(
         const variableType = queryState.variablesSchema[variableName];
 
         try {
-            const schema = await fetchAndCacheSchema(queryState.headers);
+            const schema = await fetchAndCacheSchema();
             const typeNode = parseType(variableType);
             const gqlType = typeFromAST(schema, typeNode as any);
 

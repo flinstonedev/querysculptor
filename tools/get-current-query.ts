@@ -44,7 +44,7 @@ export async function getCurrentQuery(sessionId: string, prettyPrint: boolean = 
         let warnings: string[] = [];
         try {
             const { fetchAndCacheSchema, GraphQLValidationUtils } = await import('./shared-utils.js');
-            const schema = await fetchAndCacheSchema(queryState.headers);
+            const schema = await fetchAndCacheSchema();
             if (schema && GraphQLValidationUtils.validateRequiredArguments) {
                 const validation = GraphQLValidationUtils.validateRequiredArguments(
                     schema,

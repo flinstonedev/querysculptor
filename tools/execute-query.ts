@@ -10,11 +10,19 @@ import {
     MAX_QUERY_COMPLEXITY,
     createSuccessResponse,
     createErrorResponse,
-    ErrorCode
+    ErrorCode,
+    validateGraphQLOperation,
+    checkEndpointDiversity,
+    logToolUsage
 } from "./shared-utils.js";
 
+// Maximum response size (1MB by default, configurable via env)
+const MAX_RESPONSE_SIZE = parseInt(process.env.MAX_RESPONSE_SIZE_MB || '1', 10) * 1024 * 1024;
+
 // Core business logic - testable function
-export async function executeGraphQLQuery(sessionId: string) {
+export async function executeGraphQLQuery(
+    sessionId: string
+) {
     const startTime = Date.now();
 
     try {
@@ -80,22 +88,51 @@ export async function executeGraphQLQuery(sessionId: string) {
             console.warn('Complexity analysis failed:', complexityError.message);
         }
 
+        // Validate GraphQL operation to prevent proxy abuse
+        const operationValidation = validateGraphQLOperation(queryString);
+        if (!operationValidation.valid) {
+            return createErrorResponse(
+                `Invalid operation: ${operationValidation.error}`,
+                {
+                    errorCode: ErrorCode.VALIDATION_ERROR,
+                    sessionId,
+                    details: { queryString }
+                }
+            );
+        }
+
         // Determine timeout based on complexity
         const timeout = complexityAnalysis && complexityAnalysis.complexityScore > 1500
             ? QUERY_EXECUTION_TIMEOUT.EXPENSIVE
             : QUERY_EXECUTION_TIMEOUT.DEFAULT;
 
         // Resolve endpoint and headers
-        const { url, headers: envHeaders } = resolveEndpointAndHeaders();
-        const headers = { ...envHeaders, ...queryState.headers };
+        const { url, headers, error: endpointError } = resolveEndpointAndHeaders();
 
-        if (!url) {
-            return createErrorResponse('No GraphQL endpoint configured', {
-                errorCode: ErrorCode.EXECUTION_ERROR,
-                sessionId,
-                suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT in your .env file',
-                details: { queryString, complexityAnalysis }
-            });
+        if (!url || endpointError) {
+            return createErrorResponse(
+                endpointError || 'No GraphQL endpoint configured',
+                {
+                    errorCode: ErrorCode.EXECUTION_ERROR,
+                    sessionId,
+                    suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT environment variable',
+                    details: { queryString, complexityAnalysis }
+                }
+            );
+        }
+
+        // Check endpoint diversity to prevent proxy abuse
+        const clientId = `session:${sessionId}`; // Use session as client identifier
+        const diversityCheck = await checkEndpointDiversity(clientId, url);
+        if (!diversityCheck.allowed) {
+            return createErrorResponse(
+                diversityCheck.error || 'Endpoint diversity check failed',
+                {
+                    errorCode: ErrorCode.VALIDATION_ERROR,
+                    sessionId,
+                    suggestion: 'This service is for query building, not general proxy usage'
+                }
+            );
         }
 
         // Prepare request body
@@ -120,6 +157,16 @@ export async function executeGraphQLQuery(sessionId: string) {
             );
 
             if (!response.ok) {
+                // Log failed execution
+                await logToolUsage({
+                    clientId,
+                    sessionId,
+                    toolName: 'execute-query',
+                    endpoint: url,
+                    queryComplexity: complexityAnalysis?.complexityScore,
+                    executionTime: Date.now() - startTime
+                });
+
                 return createErrorResponse(
                     `HTTP ${response.status}: ${response.statusText}`,
                     {
@@ -130,8 +177,40 @@ export async function executeGraphQLQuery(sessionId: string) {
                 );
             }
 
-            // Parse JSON response with timeout
-            const jsonPromise = response.json();
+            // Check response size before parsing (LAYER 5: Response size limits)
+            const contentLength = response.headers.get('content-length');
+            if (contentLength && parseInt(contentLength) > MAX_RESPONSE_SIZE) {
+                await logToolUsage({
+                    clientId,
+                    sessionId,
+                    toolName: 'execute-query',
+                    endpoint: url,
+                    queryComplexity: complexityAnalysis?.complexityScore,
+                    responseSize: parseInt(contentLength),
+                    executionTime: Date.now() - startTime
+                });
+
+                return createErrorResponse(
+                    `Response too large: ${contentLength} bytes (max ${MAX_RESPONSE_SIZE} bytes)`,
+                    {
+                        errorCode: ErrorCode.EXECUTION_ERROR,
+                        sessionId,
+                        suggestion: 'Reduce query complexity or use pagination to limit response size',
+                        details: { queryString, complexityAnalysis }
+                    }
+                );
+            }
+
+            // Parse JSON response with timeout and size checking
+            const jsonPromise = response.text().then(text => {
+                // Check actual response size
+                const responseSize = new Blob([text]).size;
+                if (responseSize > MAX_RESPONSE_SIZE) {
+                    throw new Error(`Response exceeded maximum size: ${responseSize} bytes (max ${MAX_RESPONSE_SIZE} bytes)`);
+                }
+                return JSON.parse(text);
+            });
+
             const result = await executeWithTimeout(
                 jsonPromise,
                 5000,
@@ -139,6 +218,20 @@ export async function executeGraphQLQuery(sessionId: string) {
             );
 
             const executionTime = Date.now() - startTime;
+
+            // Calculate response size for logging
+            const responseSize = new Blob([JSON.stringify(result)]).size;
+
+            // Log successful execution (LAYER 7: Audit logging)
+            await logToolUsage({
+                clientId,
+                sessionId,
+                toolName: 'execute-query',
+                endpoint: url,
+                queryComplexity: complexityAnalysis?.complexityScore,
+                responseSize,
+                executionTime
+            });
 
             // GraphQL can return errors alongside data
             if (result.errors && !result.data) {
@@ -195,11 +288,13 @@ export async function executeGraphQLQuery(sessionId: string) {
 
 export const executeQueryTool = {
     name: "execute-query",
-    description: "Execute the built GraphQL query against the configured endpoint and return results",
+    description: "Execute the built GraphQL query against the configured endpoint and return results.",
     schema: {
-        sessionId: z.string().describe('The session ID from start-query-session.'),
+        sessionId: z.string().describe('The session ID from start-query-session.')
     },
-    handler: async ({ sessionId }: { sessionId: string }) => {
+    handler: async ({ sessionId }: {
+        sessionId: string;
+    }) => {
         const result = await executeGraphQLQuery(sessionId);
 
         const { wrapToolResponse } = await import('./shared-utils.js');

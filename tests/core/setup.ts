@@ -252,10 +252,17 @@ export class MockStateManager {
 export const createSharedUtilsMock = (customMocks = {}) => ({
   resolveEndpointAndHeaders: vi.fn().mockReturnValue({
     url: 'http://localhost:4000/graphql',
-    headers: { 'Content-Type': 'application/json' }
+    headers: { 'Content-Type': 'application/json' },
+    error: undefined
   }),
   generateSessionId: vi.fn().mockReturnValue('test-session-id'),
   fetchAndCacheSchema: vi.fn().mockResolvedValue(TEST_SCHEMA),
+
+  // NEW: Security validation functions
+  validateGraphQLEndpoint: vi.fn().mockReturnValue({ valid: true }),
+  validateGraphQLOperation: vi.fn().mockReturnValue({ valid: true }),
+  checkEndpointDiversity: vi.fn().mockResolvedValue({ allowed: true }),
+  logToolUsage: vi.fn().mockResolvedValue(undefined),
 
   // Response helper functions - for unified response format
   createSuccessResponse: vi.fn().mockImplementation((data, options = {}) => ({

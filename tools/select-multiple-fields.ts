@@ -60,7 +60,7 @@ export async function selectMultipleFields(
 
         // Comprehensive incremental validation for each field
         try {
-            const schema = await fetchAndCacheSchema(queryState.headers);
+            const schema = await fetchAndCacheSchema();
             for (const fieldName of fieldNames) {
                 const validation = GraphQLValidationUtils.validateFieldAddition(
                     schema,

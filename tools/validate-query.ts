@@ -7,7 +7,9 @@ import { QueryState, loadQueryState, buildQueryFromStructure, GraphQLValidationU
 import { parse } from 'graphql';
 
 // Core business logic - testable function
-export async function validateGraphQLQuery(sessionId: string) {
+export async function validateGraphQLQuery(
+    sessionId: string
+) {
     const startTime = Date.now();
     try {
         // Load query state
@@ -22,7 +24,7 @@ export async function validateGraphQLQuery(sessionId: string) {
 
         // Use comprehensive query structure validation first
         try {
-            const schema = await fetchAndCacheSchema(queryState.headers);
+            const schema = await fetchAndCacheSchema();
             const validation = GraphQLValidationUtils.validateQueryStructure(schema, queryState);
 
             // If query structure validation fails, return early
@@ -204,11 +206,13 @@ export async function validateGraphQLQuery(sessionId: string) {
 
 export const validateQueryTool = {
     name: "validate-query",
-    description: "Validate the built GraphQL query against the schema for syntax and semantic correctness",
+    description: "Validate the built GraphQL query against the schema for syntax and semantic correctness.",
     schema: {
-        sessionId: z.string().describe('The session ID from start-query-session.'),
+        sessionId: z.string().describe('The session ID from start-query-session.')
     },
-    handler: async ({ sessionId }: { sessionId: string }) => {
+    handler: async ({ sessionId }: {
+        sessionId: string;
+    }) => {
         const result = await validateGraphQLQuery(sessionId);
 
         const { wrapToolResponse } = await import('./shared-utils.js');

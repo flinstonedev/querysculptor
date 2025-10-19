@@ -73,7 +73,7 @@ export async function setVariableArgument(
 
         // Schema-aware validation: ensure argument exists and variable type is compatible
         try {
-            const schema = await fetchAndCacheSchema(queryState.headers);
+            const schema = await fetchAndCacheSchema();
 
             const argType = GraphQLValidationUtils.getArgumentType(schema, currentPath, argumentName);
             if (!argType) {

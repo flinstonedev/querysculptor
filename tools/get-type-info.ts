@@ -69,22 +69,24 @@ function safeGetDescription(obj: any): string | null {
 }
 
 // Core business logic - testable function
-export async function getTypeInfo(typeName: string) {
+export async function getTypeInfo(
+    typeName: string
+) {
     const startTime = Date.now();
-    const { url: resolvedUrl, headers } = resolveEndpointAndHeaders();
+    const { url: resolvedUrl, headers, error } = resolveEndpointAndHeaders();
 
-    if (!resolvedUrl) {
+    if (!resolvedUrl || error) {
         return createErrorResponse(
-            "No default GraphQL endpoint configured in environment variables (DEFAULT_GRAPHQL_ENDPOINT)",
+            error || "No GraphQL endpoint available",
             {
                 errorCode: ErrorCode.SCHEMA_ERROR,
-                suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT in your .env file'
+                suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT environment variable'
             }
         );
     }
 
     try {
-        const schema = await fetchAndCacheSchema(headers);
+        const schema = await fetchAndCacheSchema();
         const gqlType = schema.getType(typeName);
 
         if (!gqlType) {
@@ -147,11 +149,13 @@ export async function getTypeInfo(typeName: string) {
 
 export const getTypeInfoTool = {
     name: "get-type-info",
-    description: "Get detailed information about a specific GraphQL type including fields, descriptions, and relationships",
+    description: "Get detailed information about a specific GraphQL type including fields, descriptions, and relationships.",
     schema: {
-        typeName: z.string().describe('The name of the GraphQL type to get information for.'),
+        typeName: z.string().describe('The name of the GraphQL type to get information for.')
     },
-    handler: async ({ typeName }: { typeName: string }) => {
+    handler: async ({ typeName }: {
+        typeName: string;
+    }) => {
         const result = await getTypeInfo(typeName);
         const { wrapToolResponse } = await import('./shared-utils.js');
         return wrapToolResponse(result);

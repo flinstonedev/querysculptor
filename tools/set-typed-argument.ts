@@ -51,7 +51,7 @@ async function handler({ sessionId, currentPath, argumentName, value }: SetTyped
         return { content: [{ type: 'text', text: JSON.stringify({ success: undefined, error: 'Session not found. Please start a new session.' }) }] };
     }
 
-    const schema = await fetchAndCacheSchema(state.headers);
+    const schema = await fetchAndCacheSchema();
     if (!schema) {
         return { content: [{ type: 'text', text: JSON.stringify({ success: undefined, error: 'Could not fetch or load GraphQL schema.' }) }] };
     }

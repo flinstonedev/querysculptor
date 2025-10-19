@@ -102,7 +102,7 @@ export async function setQueryVariable(
         // Set default value if provided
         if (defaultValue !== undefined) {
             try {
-                const schema = await fetchAndCacheSchema(queryState.headers);
+                const schema = await fetchAndCacheSchema();
                 const typeNode = parseType(variableType);
                 const gqlType = typeFromAST(schema, typeNode as any);
 

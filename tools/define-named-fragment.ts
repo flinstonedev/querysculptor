@@ -58,7 +58,7 @@ export async function defineNamedFragment(
         // Validate that the type exists in the schema
         try {
             const { fetchAndCacheSchema } = await import('./shared-utils.js');
-            const schema = await fetchAndCacheSchema(queryState.headers);
+            const schema = await fetchAndCacheSchema();
             if (schema) {
                 const type = schema.getType(onType);
                 if (!type) {
@@ -94,7 +94,7 @@ export async function defineNamedFragment(
         // Validate fields exist on the type
         try {
             const { fetchAndCacheSchema } = await import('./shared-utils.js');
-            const schema = await fetchAndCacheSchema(queryState.headers);
+            const schema = await fetchAndCacheSchema();
             if (schema) {
                 const type = schema.getType(onType);
                 if (type && (isObjectType(type) || isInterfaceType(type))) {

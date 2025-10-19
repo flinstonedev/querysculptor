@@ -19,20 +19,20 @@ export async function getFieldInfo(
     fieldName: string
 ) {
     const startTime = Date.now();
-    const { url: resolvedUrl, headers } = resolveEndpointAndHeaders();
+    const { url: resolvedUrl, headers, error } = resolveEndpointAndHeaders();
 
-    if (!resolvedUrl) {
+    if (!resolvedUrl || error) {
         return createErrorResponse(
-            "No default GraphQL endpoint configured in environment variables (DEFAULT_GRAPHQL_ENDPOINT)",
+            error || "No GraphQL endpoint available",
             {
                 errorCode: ErrorCode.SCHEMA_ERROR,
-                suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT in your .env file'
+                suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT environment variable'
             }
         );
     }
 
     try {
-        const schema = await fetchAndCacheSchema(headers);
+        const schema = await fetchAndCacheSchema();
         const gqlType = schema.getType(typeName);
 
         if (!gqlType || (!isObjectType(gqlType) && !isInterfaceType(gqlType))) {
@@ -88,12 +88,15 @@ export async function getFieldInfo(
 
 export const getFieldInfoTool = {
     name: "get-field-info",
-    description: "Get detailed information about a specific field within a GraphQL type including arguments and return type",
+    description: "Get detailed information about a specific field within a GraphQL type including arguments and return type.",
     schema: {
         typeName: z.string().describe('The name of the parent GraphQL type.'),
-        fieldName: z.string().describe('The name of the field to get information for.'),
+        fieldName: z.string().describe('The name of the field to get information for.')
     },
-    handler: async ({ typeName, fieldName }: { typeName: string, fieldName: string }) => {
+    handler: async ({ typeName, fieldName }: {
+        typeName: string;
+        fieldName: string;
+    }) => {
         const result = await getFieldInfo(typeName, fieldName);
         const { wrapToolResponse } = await import('./shared-utils.js');
         return wrapToolResponse(result);

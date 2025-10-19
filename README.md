@@ -175,6 +175,12 @@ vercel dev
 # 🚀 Your MCP server is live at http://localhost:3000/mcp
 ```
 
+**To set custom endpoint and bearer token**, edit your `.env` file:
+```bash
+DEFAULT_GRAPHQL_ENDPOINT=https://your-api.com/graphql
+DEFAULT_GRAPHQL_HEADERS={"Authorization": "Bearer your_token"}
+```
+
 ## 🎯 **Use Cases**
 
 ### **🔍 Data Discovery**
@@ -289,6 +295,22 @@ Edit your configuration file:
 }
 ```
 
+**To set custom endpoint and bearer token**, add `env` to your configuration:
+```json
+{
+  "mcpServers": {
+    "querysculptor": {
+      "command": "npx",
+      "args": ["mcp-remote", "https://your-querysculptor.vercel.app/mcp"],
+      "env": {
+        "DEFAULT_GRAPHQL_ENDPOINT": "https://your-api.com/graphql",
+        "DEFAULT_GRAPHQL_HEADERS": "{\"Authorization\": \"Bearer your_token\"}"
+      }
+    }
+  }
+}
+```
+
 ### **🔍 Troubleshooting**
 
 If you encounter issues:
@@ -314,8 +336,8 @@ If you encounter issues:
 
 After deployment, configure these environment variables in your Vercel dashboard:
 - `REDIS_URL` - your Redis connection string
-- `DEFAULT_GRAPHQL_ENDPOINT` - your GraphQL API endpoint
-- `DEFAULT_GRAPHQL_HEADERS` - JSON string with default headers for the GraphQL API (optional)
+- `DEFAULT_GRAPHQL_ENDPOINT` - your GraphQL API endpoint (optional)
+- `DEFAULT_GRAPHQL_HEADERS` - JSON string with headers for authentication (optional)
 
 **Manual Deploy:**
 ```bash
@@ -325,10 +347,13 @@ cd querysculptor
 vercel --prod
 ```
 
-Configure these environment variables in your Vercel dashboard:
-- `REDIS_URL` - your Redis connection string  
-- `DEFAULT_GRAPHQL_ENDPOINT` - your GraphQL API endpoint
-- `DEFAULT_GRAPHQL_HEADERS` - JSON string with default headers for the GraphQL API (optional)
+Configure environment variables in Vercel dashboard.
+
+**To set custom endpoint and bearer token**, add these to your Vercel environment variables:
+```
+DEFAULT_GRAPHQL_ENDPOINT=https://your-api.com/graphql
+DEFAULT_GRAPHQL_HEADERS={"Authorization": "Bearer your_token"}
+```
 
 ## 🧪 **Testing**
 

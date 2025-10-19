@@ -87,7 +87,7 @@ export async function setStringArgument(
         let validationWarning: string | undefined;
         try {
             const { fetchAndCacheSchema } = await import('./shared-utils.js');
-            const schema = await fetchAndCacheSchema(queryState.headers);
+            const schema = await fetchAndCacheSchema();
             
             const validation = GraphQLValidationUtils.validateArgumentAddition(
                 schema,

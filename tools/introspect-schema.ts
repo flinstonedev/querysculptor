@@ -12,20 +12,20 @@ import {
 // Core business logic - testable function
 export async function introspectGraphQLSchema() {
     const startTime = Date.now();
-    const { url: resolvedUrl, headers } = resolveEndpointAndHeaders();
+    const { url: resolvedUrl, headers, error } = resolveEndpointAndHeaders();
 
-    if (!resolvedUrl) {
+    if (!resolvedUrl || error) {
         return createErrorResponse(
-            "No default GraphQL endpoint configured in environment variables (DEFAULT_GRAPHQL_ENDPOINT)",
+            error || "No GraphQL endpoint available",
             {
                 errorCode: ErrorCode.SCHEMA_ERROR,
-                suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT in your .env file'
+                suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT environment variable'
             }
         );
     }
 
     try {
-        const schema = await fetchAndCacheSchema(headers);
+        const schema = await fetchAndCacheSchema();
         const rawJson = rawSchemaJsonCache.get(resolvedUrl) || {};
         const schemaSdl = printSchema(schema);
 
@@ -72,11 +72,13 @@ export async function introspectGraphQLSchema() {
 
 export const introspectSchemaTool = {
     name: "introspect-schema",
-    description: "Retrieve the complete GraphQL schema definition for API understanding and exploration",
+    description: "Retrieve the complete GraphQL schema definition for API understanding and exploration.",
     schema: {
-        format: z.enum(['sdl', 'json', 'both']).default('both').describe('Format to return schema in: SDL text, JSON object, or both.'),
+        format: z.enum(['sdl', 'json', 'both']).default('both').describe('Format to return schema in: SDL text, JSON object, or both.')
     },
-    handler: async ({ format = 'both' }: { format?: 'sdl' | 'json' | 'both' }) => {
+    handler: async ({ format = 'both' }: {
+        format?: 'sdl' | 'json' | 'both';
+    }) => {
         const result = await introspectGraphQLSchema();
 
         // Import wrapToolResponse at runtime to avoid circular dependencies

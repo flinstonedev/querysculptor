@@ -1340,29 +1340,243 @@ function sanitizeUrlForLogging(url: string): string {
     }
 }
 
-// Helper function to resolve endpoint and headers
-// SECURITY: Only allows requests to the default GraphQL endpoint to prevent SSRF attacks
-// Mock-first approach for testing - defaults to localhost
-export function resolveEndpointAndHeaders(): { url: string | null; headers: Record<string, string> } {
-    // Only use the default endpoint from environment variables
-    const defaultEndpoint = process.env.DEFAULT_GRAPHQL_ENDPOINT;
+// ============================================================================
+// Endpoint Validation and Security Functions
+// ============================================================================
+
+/**
+ * Validate GraphQL endpoint URL to prevent SSRF and proxy abuse
+ */
+export function validateGraphQLEndpoint(url: string): { valid: boolean; error?: string } {
+    try {
+        const parsedUrl = new URL(url);
+
+        // 1. Require HTTPS in production
+        const requireHttps = process.env.REQUIRE_HTTPS !== 'false'; // Default true
+        if (requireHttps && process.env.NODE_ENV === 'production' && parsedUrl.protocol !== 'https:') {
+            return { valid: false, error: 'Only HTTPS endpoints allowed in production' };
+        }
+
+        // 2. Block private IP ranges (SSRF protection)
+        const hostname = parsedUrl.hostname;
+
+        // Block localhost/loopback (except in test/dev)
+        const allowLocalhost = process.env.ALLOW_LOCALHOST_ENDPOINTS === 'true' ||
+                               process.env.NODE_ENV === 'test' ||
+                               process.env.NODE_ENV === 'development';
+
+        if (!allowLocalhost) {
+            if (hostname === 'localhost' ||
+                hostname === '127.0.0.1' ||
+                hostname.startsWith('127.') ||
+                hostname === '::1' ||
+                hostname === '0.0.0.0') {
+                return { valid: false, error: 'Localhost endpoints not allowed in production' };
+            }
+        }
+
+        // Block private networks (RFC1918)
+        const privateIPRegex = /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/;
+        if (privateIPRegex.test(hostname)) {
+            return { valid: false, error: 'Private IP ranges (10.x, 172.16-31.x, 192.168.x) not allowed' };
+        }
+
+        // Block cloud metadata endpoints (AWS, GCP, Azure)
+        if (hostname === '169.254.169.254' || hostname.startsWith('169.254.')) {
+            return { valid: false, error: 'Cloud metadata endpoints not allowed (SSRF protection)' };
+        }
+
+        // Block link-local addresses
+        if (hostname.startsWith('fe80:')) {
+            return { valid: false, error: 'Link-local addresses not allowed' };
+        }
+
+        // 3. Require valid GraphQL-like path (relaxed check)
+        const path = parsedUrl.pathname.toLowerCase();
+        if (!path.includes('graphql') &&
+            !path.includes('api') &&
+            !path.endsWith('/') &&
+            path !== '') {
+            return {
+                valid: false,
+                error: 'Endpoint path should contain "graphql" or "api" for GraphQL APIs'
+            };
+        }
+
+        // 4. Check port allowlist (if configured)
+        const allowedPortsEnv = process.env.ALLOWED_ENDPOINT_PORTS;
+        if (allowedPortsEnv && parsedUrl.port) {
+            const allowedPorts = allowedPortsEnv.split(',').map(p => p.trim());
+            if (!allowedPorts.includes(parsedUrl.port)) {
+                return {
+                    valid: false,
+                    error: `Port ${parsedUrl.port} not in allowed list: ${allowedPortsEnv}`
+                };
+            }
+        }
+
+        return { valid: true };
+
+    } catch (error) {
+        return { valid: false, error: 'Invalid URL format' };
+    }
+}
+
+/**
+ * Validate GraphQL operation to prevent proxy abuse
+ */
+export function validateGraphQLOperation(queryString: string): { valid: boolean; error?: string } {
+    try {
+        const document = parse(queryString);
+
+        for (const definition of document.definitions) {
+            if (definition.kind === 'OperationDefinition') {
+
+                // 1. Block subscriptions (real-time proxy abuse)
+                const allowSubscriptions = process.env.ALLOW_SUBSCRIPTIONS === 'true';
+                if (!allowSubscriptions && definition.operation === 'subscription') {
+                    return {
+                        valid: false,
+                        error: 'Subscriptions not supported (potential proxy abuse)'
+                    };
+                }
+
+                // 2. Require operation name for non-introspection queries (optional)
+                const requireOpNames = process.env.REQUIRE_OPERATION_NAMES === 'true';
+                if (requireOpNames && !definition.name) {
+                    const queryText = queryString.toLowerCase();
+                    const isIntrospection = queryText.includes('__schema') ||
+                                           queryText.includes('__type') ||
+                                           queryText.includes('introspectionquery');
+
+                    if (!isIntrospection) {
+                        return {
+                            valid: false,
+                            error: 'Operation name required for audit logging'
+                        };
+                    }
+                }
+            }
+        }
+
+        return { valid: true };
+
+    } catch (error) {
+        return {
+            valid: false,
+            error: `Invalid GraphQL syntax: ${error instanceof Error ? error.message : String(error)}`
+        };
+    }
+}
+
+/**
+ * Track endpoint diversity per client to prevent proxy abuse
+ */
+export async function checkEndpointDiversity(clientId: string, endpoint: string): Promise<{ allowed: boolean; error?: string }> {
+    try {
+        const maxEndpoints = parseInt(process.env.MAX_ENDPOINTS_PER_CLIENT || '10', 10);
+        const key = `endpoints:${clientId}`;
+
+        // Add a quick timeout for Redis initialization (1 second max)
+        const initPromise = initializeRedis();
+        const timeoutPromise = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 1000));
+        const redisAvailable = await Promise.race([initPromise, timeoutPromise]);
+
+        if (!redisAvailable || !useRedis) {
+            // If Redis unavailable, allow but log warning
+            console.warn('Redis unavailable for endpoint diversity check');
+            return { allowed: true };
+        }
+
+        const endpoints = await redis.sMembers(key);
+
+        // Check if this would exceed the limit
+        if (endpoints.length >= maxEndpoints && !endpoints.includes(endpoint)) {
+            return {
+                allowed: false,
+                error: `Maximum ${maxEndpoints} different endpoints allowed per client. This prevents proxy abuse.`
+            };
+        }
+
+        // Add endpoint to set
+        await redis.sAdd(key, endpoint);
+        await redis.expire(key, 3600); // 1 hour window
+
+        return { allowed: true };
+
+    } catch (error) {
+        console.warn('Error checking endpoint diversity:', error);
+        return { allowed: true }; // Fail open
+    }
+}
+
+/**
+ * Audit log for tool usage tracking
+ */
+export async function logToolUsage(metadata: {
+    clientId: string;
+    sessionId?: string;
+    toolName: string;
+    endpoint: string;
+    queryComplexity?: number;
+    responseSize?: number;
+    executionTime?: number;
+}): Promise<void> {
+    try {
+        const logEntry = {
+            timestamp: new Date().toISOString(),
+            ...metadata
+        };
+
+        // Log to console
+        console.log('AUDIT', JSON.stringify(logEntry));
+
+        // Store in Redis if available (7 day retention)
+        await initializeRedis();
+        if (useRedis) {
+            const logKey = `audit:${Date.now()}:${metadata.sessionId || 'no-session'}`;
+            await redis.set(logKey, JSON.stringify(logEntry), { EX: 7 * 24 * 60 * 60 });
+        }
+    } catch (error) {
+        console.warn('Error logging tool usage:', error);
+    }
+}
+
+// Helper function to resolve endpoint and headers from environment variables only
+// SECURITY: Validates endpoints to prevent SSRF attacks and proxy abuse
+// NOTE: Credentials should be configured in environment variables, NOT passed by LLM
+export function resolveEndpointAndHeaders(): { url: string | null; headers: Record<string, string>; error?: string } {
     let resolvedUrl: string | null = null;
+    const headers: Record<string, string> = {};
+
+    // Step 1: Resolve endpoint from environment variable
+    const defaultEndpoint = process.env.DEFAULT_GRAPHQL_ENDPOINT;
 
     if (defaultEndpoint) {
+        // Validate env endpoint to prevent SSRF
+        const validation = validateGraphQLEndpoint(defaultEndpoint);
+        if (!validation.valid) {
+            console.warn(`DEFAULT_GRAPHQL_ENDPOINT validation failed: ${validation.error}`);
+            return { url: null, headers: {}, error: `Endpoint configuration invalid: ${validation.error}` };
+        }
+
         resolvedUrl = defaultEndpoint;
-        console.log(`Using default GraphQL endpoint: ${sanitizeUrlForLogging(defaultEndpoint)}`);
+        console.log(`Using configured GraphQL endpoint: ${sanitizeUrlForLogging(defaultEndpoint)}`);
     } else {
-        // For test environments, default to localhost to prevent real network calls
+        // For test environments, default to localhost
         if (process.env.NODE_ENV === 'test') {
             resolvedUrl = 'http://localhost:4000/graphql';
             console.log('Test environment: using localhost GraphQL endpoint');
         } else {
-            console.warn('No DEFAULT_GRAPHQL_ENDPOINT configured in environment variables');
+            return {
+                url: null,
+                headers: {},
+                error: 'No GraphQL endpoint configured. Set DEFAULT_GRAPHQL_ENDPOINT environment variable.'
+            };
         }
     }
 
-    const headers: Record<string, string> = {};
-
+    // Step 2: Build headers from environment variable
     if (process.env.DEFAULT_GRAPHQL_HEADERS) {
         try {
             const defaultHeaders = JSON.parse(process.env.DEFAULT_GRAPHQL_HEADERS);
@@ -1375,42 +1589,45 @@ export function resolveEndpointAndHeaders(): { url: string | null; headers: Reco
                 if (typeof key !== 'string' || typeof value !== 'string') {
                     throw new Error(`Invalid header: ${key} must be string`);
                 }
-                if (key.length > 100 || value.length > 1000) {
+                if (key.length > 100 || (value as string).length > 1000) {
                     throw new Error(`Header ${key} exceeds maximum length`);
                 }
             }
 
             Object.assign(headers, defaultHeaders);
+            console.log(`Loaded ${Object.keys(defaultHeaders).length} header(s) from configuration`);
         } catch (error) {
             console.warn(`Failed to parse DEFAULT_GRAPHQL_HEADERS: ${error instanceof Error ? error.message : 'Invalid JSON'}`);
         }
     }
 
+    // Always set Content-Type for GraphQL
+    if (!headers['Content-Type']) {
+        headers['Content-Type'] = 'application/json';
+    }
+
     return { url: resolvedUrl, headers };
 }
 
-// Fetch and cache schema
-export async function fetchAndCacheSchema(sessionHeaders?: Record<string, string>): Promise<GraphQLSchema> {
-    const { url: resolvedUrl, headers: envHeaders } = resolveEndpointAndHeaders();
+// Fetch and cache schema from configured endpoint
+export async function fetchAndCacheSchema(): Promise<GraphQLSchema> {
+    const { url: resolvedUrl, headers, error } = resolveEndpointAndHeaders();
 
-    if (!resolvedUrl) {
-        throw new Error("No default GraphQL endpoint configured in environment variables (DEFAULT_GRAPHQL_ENDPOINT)");
+    if (!resolvedUrl || error) {
+        throw new Error(error || "No GraphQL endpoint configured");
     }
 
+    // Check cache (keyed by endpoint URL)
     if (schemaCache.has(resolvedUrl)) {
         return schemaCache.get(resolvedUrl)!;
     }
 
-    const mergedHeaders = { ...envHeaders, ...sessionHeaders };
     const introspectionQuery = getIntrospectionQuery({ descriptions: true });
 
     try {
         const response = await fetch(resolvedUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...mergedHeaders,
-            },
+            headers,
             body: JSON.stringify({ query: introspectionQuery }),
         });
 
@@ -1434,7 +1651,7 @@ export async function fetchAndCacheSchema(sessionHeaders?: Record<string, string
 
         return schema;
     } catch (error) {
-        throw new Error(`Error processing schema from ${resolvedUrl}: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(`Error fetching schema from ${sanitizeUrlForLogging(resolvedUrl)}: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
 

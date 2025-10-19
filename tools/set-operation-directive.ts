@@ -41,7 +41,7 @@ export async function setOperationDirective(
         // Schema-aware validation for directive and its argument
         if (argumentName) {
             try {
-                const schema = await fetchAndCacheSchema(queryState.headers);
+                const schema = await fetchAndCacheSchema();
                 const directive = schema.getDirective(directiveName);
                 if (!directive) {
                     return createErrorResponse(

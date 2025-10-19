@@ -11,20 +11,20 @@ import {
 // Core business logic - testable function
 export async function getRootOperationTypes() {
     const startTime = Date.now();
-    const { url: resolvedUrl, headers } = resolveEndpointAndHeaders();
+    const { url: resolvedUrl, headers, error } = resolveEndpointAndHeaders();
 
-    if (!resolvedUrl) {
+    if (!resolvedUrl || error) {
         return createErrorResponse(
-            "No default GraphQL endpoint configured in environment variables (DEFAULT_GRAPHQL_ENDPOINT)",
+            error || "No GraphQL endpoint available",
             {
                 errorCode: ErrorCode.SCHEMA_ERROR,
-                suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT in your .env file'
+                suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT environment variable'
             }
         );
     }
 
     try {
-        const schema = await fetchAndCacheSchema(headers);
+        const schema = await fetchAndCacheSchema();
         return createSuccessResponse(
             {
                 query_type: schema.getQueryType()?.name || null,
@@ -47,11 +47,13 @@ export async function getRootOperationTypes() {
 
 export const getRootOperationTypesTool = {
     name: "get-root-ops",
-    description: "Discover the available root operation types (Query, Mutation, Subscription) and their entry points",
+    description: "Discover the available root operation types (Query, Mutation, Subscription) and their entry points.",
     schema: {
-        includeFieldCounts: z.boolean().default(false).describe('Include count of available fields for each root operation type.'),
+        includeFieldCounts: z.boolean().default(false).describe('Include count of available fields for each root operation type.')
     },
-    handler: async ({ includeFieldCounts = false }: { includeFieldCounts?: boolean }) => {
+    handler: async ({ includeFieldCounts = false }: {
+        includeFieldCounts?: boolean;
+    }) => {
         const result = await getRootOperationTypes();
         const { wrapToolResponse } = await import('./shared-utils.js');
         return wrapToolResponse(result);

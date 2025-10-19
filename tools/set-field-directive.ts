@@ -60,7 +60,7 @@ export async function setFieldDirective(
         }
 
         try {
-            const schema = await fetchAndCacheSchema(queryState.headers);
+            const schema = await fetchAndCacheSchema();
             const directive = schema.getDirective(directiveName);
 
             if (!directive) {

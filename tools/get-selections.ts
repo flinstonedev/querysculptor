@@ -33,7 +33,7 @@ export async function getAvailableSelections(
         }
 
         // Get schema from cache
-        const schema = await fetchAndCacheSchema(queryState.headers);
+        const schema = await fetchAndCacheSchema();
 
         // Resolve type at the current path
         let currentType: GraphQLType = schema.getType(queryState.operationTypeName)!;

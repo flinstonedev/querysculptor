@@ -66,7 +66,7 @@ export async function selectGraphQLField(
 
         // Comprehensive incremental validation
         try {
-            const schema = await fetchAndCacheSchema(queryState.headers);
+            const schema = await fetchAndCacheSchema();
             const validation = GraphQLValidationUtils.validateFieldAddition(
                 schema,
                 queryState,

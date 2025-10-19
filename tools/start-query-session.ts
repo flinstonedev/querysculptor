@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { GraphQLSchema } from 'graphql';
 import {
     resolveEndpointAndHeaders,
     fetchAndCacheSchema,
@@ -21,6 +20,7 @@ export async function createQuerySession(
     operationName?: string;
     createdAt?: string;
     error?: string;
+    warning?: string;
 }> {
     // Validate operation name syntax
     const operationNameValidation = GraphQLValidationUtils.validateOperationName(operationName || null);
@@ -30,26 +30,33 @@ export async function createQuerySession(
         };
     }
 
-    const { url: resolvedUrl, headers: envHeaders } = resolveEndpointAndHeaders();
+    // Resolve endpoint
+    const { url: resolvedUrl, error } = resolveEndpointAndHeaders();
 
-    if (!resolvedUrl) {
+    if (!resolvedUrl || error) {
         return {
-            error: "No default GraphQL endpoint configured in environment variables (DEFAULT_GRAPHQL_ENDPOINT)"
+            error: error || "No GraphQL endpoint available"
         };
     }
 
-    // Merge headers with session headers taking precedence
-    const mergedHeaders = { ...envHeaders, ...sessionHeaders };
-
     // --- Input Validation ---
-    const complexityError = validateInputComplexity(mergedHeaders, "headers");
-    if (complexityError) {
-        return { sessionId: '', error: complexityError };
+    if (sessionHeaders) {
+        const complexityError = validateInputComplexity(sessionHeaders, "headers");
+        if (complexityError) {
+            return { sessionId: '', error: complexityError };
+        }
     }
     // --- End Input Validation ---
 
+    // Warning if bearer token would be stored in session
+    let warning: string | undefined;
+    if (sessionHeaders && sessionHeaders['Authorization']?.includes('Bearer')) {
+        warning = 'WARNING: Authorization header stored in session. Consider using environment variables for credentials instead.';
+    }
+
     try {
-        const schema = await fetchAndCacheSchema(mergedHeaders);
+        // Fetch schema
+        const schema = await fetchAndCacheSchema();
 
         // Check if the operation type is supported by the schema
         let operationTypeName: string;
@@ -71,7 +78,7 @@ export async function createQuerySession(
         const queryState: QueryState = {
             stateVersion: 0,
             lastModified: now,
-            headers: mergedHeaders,
+            headers: sessionHeaders || {}, // Only store session headers, NOT transient credentials
             operationType,
             operationTypeName,
             operationName: operationName || null,
@@ -95,7 +102,8 @@ export async function createQuerySession(
             sessionId: sessionId,
             operationType: operationType,
             operationName: operationName,
-            createdAt: queryState.createdAt
+            createdAt: queryState.createdAt,
+            warning
         };
     } catch (error) {
         return {
@@ -106,11 +114,11 @@ export async function createQuerySession(
 
 export const startQuerySessionTool = {
     name: "start-query-session",
-    description: "Initialize a new GraphQL query building session with persistent state management",
+    description: "Initialize a new GraphQL query building session with persistent state management.",
     schema: {
         operationType: z.enum(["query", "mutation", "subscription"]).default("query").describe('The type of GraphQL operation: query, mutation, or subscription.'),
         operationName: z.string().optional().describe('An optional name for the GraphQL operation (e.g., "MyQueryName").'),
-        headers: z.record(z.string()).optional().describe('Optional: Custom HTTP headers for this session (e.g., for authentication).'),
+        headers: z.record(z.string()).optional().describe('Optional: Custom HTTP headers stored in session state. WARNING: Avoid storing sensitive credentials here - use environment variables instead.')
     },
     handler: async ({ operationType = "query", operationName, headers: sessionHeaders }: {
         operationType?: string,

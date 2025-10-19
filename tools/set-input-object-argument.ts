@@ -101,7 +101,7 @@ export async function setInputObjectArgument(
 
         // Schema-aware validation: ensure the argument exists and is an input object, and that objectPath is valid
         try {
-            const schema = await fetchAndCacheSchema(queryState.headers);
+            const schema = await fetchAndCacheSchema();
 
             // Resolve field definition in schema from fieldPath
             // Start from the correct root operation type

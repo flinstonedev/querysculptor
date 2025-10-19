@@ -209,21 +209,26 @@ describe('Integration Tests - Complete Query Building Workflow', () => {
         expect(validationResult.data.valid).toBe(true);
 
         // Step 9: Mock successful execution
-        vi.spyOn(global, 'fetch').mockResolvedValue({
-            json: () => Promise.resolve({
-                data: {
-                    user: {
-                        id: '1',
-                        name: 'John Doe',
-                        posts: [
-                            { id: '1', title: 'First Post' },
-                            { id: '2', title: 'Second Post' }
-                        ]
-                    }
+        const responseData = JSON.stringify({
+            data: {
+                user: {
+                    id: '1',
+                    name: 'John Doe',
+                    posts: [
+                        { id: '1', title: 'First Post' },
+                        { id: '2', title: 'Second Post' }
+                    ]
                 }
-            }),
+            }
+        });
+        vi.spyOn(global, 'fetch').mockResolvedValue({
             ok: true,
-        } as Response);
+            headers: {
+                get: vi.fn().mockReturnValue(null),
+            },
+            text: () => Promise.resolve(responseData),
+            json: () => Promise.resolve(JSON.parse(responseData))
+        } as unknown as Response);
 
         const executionResult = await executeGraphQLQuery('integration-test-session');
         expect(executionResult.data).toBeDefined();

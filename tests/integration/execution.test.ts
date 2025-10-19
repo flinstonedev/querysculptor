@@ -39,8 +39,21 @@ vi.mock('../../tools/shared-utils', async () => {
         saveQueryState: vi.fn(),
         fetchAndCacheSchema: vi.fn(),
         // Add response helper mocks
-        createSuccessResponse: vi.fn((data) => ({ data })),
-        createErrorResponse: vi.fn((error) => ({ error })),
+        createSuccessResponse: vi.fn((data, options) => ({
+            success: true,
+            data,
+            ...options && { metadata: options }
+        })),
+        createErrorResponse: vi.fn((error, options) => ({
+            success: false,
+            error,
+            ...options && { details: options }
+        })),
+        // Ensure security functions are included
+        validateGraphQLOperation: vi.fn().mockReturnValue({ valid: true }),
+        validateGraphQLEndpoint: vi.fn().mockReturnValue({ valid: true }),
+        checkEndpointDiversity: vi.fn().mockResolvedValue({ allowed: true }),
+        logToolUsage: vi.fn().mockResolvedValue(undefined),
     };
 });
 
@@ -79,9 +92,13 @@ describe('Query Execution', () => {
         vi.mocked(sharedUtils.buildQueryFromStructure).mockReturnValue('query MyQuery { user(id: "1") { name } }');
 
         global.fetch = vi.fn().mockResolvedValue({
-            json: () => Promise.resolve({ data: { user: { name: 'Test User' } } }),
             ok: true,
-        } as Response);
+            headers: {
+                get: vi.fn().mockReturnValue(null), // No content-length header
+            },
+            text: () => Promise.resolve(JSON.stringify({ data: { user: { name: 'Test User' } } })),
+            json: () => Promise.resolve({ data: { user: { name: 'Test User' } } }),
+        } as unknown as Response);
     });
 
     it('should execute a query successfully', async () => {
@@ -393,33 +410,46 @@ describe('Enhanced Execution and Validation Tests', () => {
                 ok: false,
                 status: 500,
                 statusText: 'Internal Server Error',
+                headers: {
+                    get: vi.fn().mockReturnValue(null),
+                },
                 json: () => Promise.resolve({ errors: [{ message: 'Server error' }] })
-            } as Response);
+            } as unknown as Response);
 
             const result = await executeGraphQLQuery('test-session');
             expect(result.error).toContain('HTTP 500');
         });
 
         it('should handle malformed JSON responses', async () => {
+            const responseData = JSON.stringify({ data: { user: {} } });
             global.fetch = vi.fn().mockResolvedValue({
                 ok: true,
+                headers: {
+                    get: vi.fn().mockReturnValue(null),
+                },
+                text: () => Promise.reject(new Error('Unexpected token in JSON')),
                 json: () => Promise.reject(new Error('Unexpected token in JSON'))
-            } as Response);
+            } as unknown as Response);
 
             const result = await executeGraphQLQuery('test-session');
             expect(result.error).toContain('Unexpected token in JSON');
         });
 
         it('should handle GraphQL errors in response', async () => {
+            const responseData = JSON.stringify({
+                errors: [
+                    { message: 'User not found', locations: [{ line: 2, column: 3 }] },
+                    { message: 'Unauthorized access' }
+                ]
+            });
             global.fetch = vi.fn().mockResolvedValue({
                 ok: true,
-                json: () => Promise.resolve({
-                    errors: [
-                        { message: 'User not found', locations: [{ line: 2, column: 3 }] },
-                        { message: 'Unauthorized access' }
-                    ]
-                })
-            } as Response);
+                headers: {
+                    get: vi.fn().mockReturnValue(null),
+                },
+                text: () => Promise.resolve(responseData),
+                json: () => Promise.resolve(JSON.parse(responseData))
+            } as unknown as Response);
 
             const result = await executeGraphQLQuery('test-session');
             expect(result.error).toContain('GraphQL errors');
@@ -428,13 +458,18 @@ describe('Enhanced Execution and Validation Tests', () => {
         });
 
         it('should handle partial data with errors', async () => {
+            const responseData = JSON.stringify({
+                data: { user: { name: 'John' } },
+                errors: [{ message: 'Could not fetch posts' }]
+            });
             global.fetch = vi.fn().mockResolvedValue({
                 ok: true,
-                json: () => Promise.resolve({
-                    data: { user: { name: 'John' } },
-                    errors: [{ message: 'Could not fetch posts' }]
-                })
-            } as Response);
+                headers: {
+                    get: vi.fn().mockReturnValue(null),
+                },
+                text: () => Promise.resolve(responseData),
+                json: () => Promise.resolve(JSON.parse(responseData))
+            } as unknown as Response);
 
             const result = await executeGraphQLQuery('test-session');
             expect(result.data.data).toEqual({ user: { name: 'John' } });
@@ -457,19 +492,17 @@ describe('Enhanced Execution and Validation Tests', () => {
             vi.mocked(sharedUtils.loadQueryState).mockResolvedValue(queryStateWithHeaders as any);
 
             // Mock the execute function behavior to include custom headers
+            const responseData = JSON.stringify({ data: { user: { name: 'Test' } } });
             global.fetch = vi.fn().mockImplementation((url, options) => {
-                // This simulates the correct behavior where custom headers should be merged
-                const expectedHeaders = {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer token123',
-                    'X-Custom': 'value'
-                };
-
                 // For this test, manually return the success response
                 return Promise.resolve({
                     ok: true,
-                    json: () => Promise.resolve({ data: { user: { name: 'Test' } } })
-                } as Response);
+                    headers: {
+                        get: vi.fn().mockReturnValue(null),
+                    },
+                    text: () => Promise.resolve(responseData),
+                    json: () => Promise.resolve(JSON.parse(responseData))
+                } as unknown as Response);
             });
 
             const result = await executeGraphQLQuery('test-session');
@@ -500,10 +533,15 @@ describe('Enhanced Execution and Validation Tests', () => {
             vi.mocked(sharedUtils.loadQueryState).mockResolvedValue(queryStateWithVariables as any);
             vi.mocked(sharedUtils.buildQueryFromStructure).mockReturnValue('query($userId: ID!) { user(id: $userId) { name } }');
 
+            const responseData = JSON.stringify({ data: { user: { name: 'Test' } } });
             global.fetch = vi.fn().mockResolvedValue({
                 ok: true,
-                json: () => Promise.resolve({ data: { user: { name: 'Test' } } })
-            } as Response);
+                headers: {
+                    get: vi.fn().mockReturnValue(null),
+                },
+                text: () => Promise.resolve(responseData),
+                json: () => Promise.resolve(JSON.parse(responseData))
+            } as unknown as Response);
 
             await executeGraphQLQuery('test-session');
 
@@ -512,7 +550,8 @@ describe('Enhanced Execution and Validation Tests', () => {
                 expect.objectContaining({
                     body: JSON.stringify({
                         query: 'query($userId: ID!) { user(id: $userId) { name } }',
-                        variables: { '$userId': 'user123' }
+                        variables: { '$userId': 'user123' },
+                        operationName: undefined
                     })
                 })
             );
@@ -533,10 +572,15 @@ describe('Enhanced Execution and Validation Tests', () => {
             vi.mocked(sharedUtils.loadQueryState).mockResolvedValue(mutationState as any);
             vi.mocked(sharedUtils.buildQueryFromStructure).mockReturnValue('mutation CreateUser { createUser { id name } }');
 
+            const responseData = JSON.stringify({ data: { createUser: { id: '1', name: 'New User' } } });
             global.fetch = vi.fn().mockResolvedValue({
                 ok: true,
-                json: () => Promise.resolve({ data: { createUser: { id: '1', name: 'New User' } } })
-            } as Response);
+                headers: {
+                    get: vi.fn().mockReturnValue(null),
+                },
+                text: () => Promise.resolve(responseData),
+                json: () => Promise.resolve(JSON.parse(responseData))
+            } as unknown as Response);
 
             const result = await executeGraphQLQuery('test-session');
             expect(result.data.data).toEqual({ createUser: { id: '1', name: 'New User' } });

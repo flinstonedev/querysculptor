@@ -167,6 +167,7 @@ describe('getInputObjectHelp direct function tests', () => {
         vi.mocked(sharedUtils.resolveEndpointAndHeaders).mockReturnValue({
             url: null,
             headers: {},
+            error: 'No GraphQL endpoint available'
         });
 
         const result = await getInputObjectHelpTool.handler({
@@ -174,7 +175,7 @@ describe('getInputObjectHelp direct function tests', () => {
         });
 
         const response = JSON.parse(result.content[0].text);
-        expect(response.error).toContain('No default GraphQL endpoint configured');
+        expect(response.error).toContain('No GraphQL endpoint');
     });
 
     it('should handle type not found', async () => {

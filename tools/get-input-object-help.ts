@@ -40,19 +40,19 @@ export async function getInputObjectHelp(
     const startTime = Date.now();
 
     try {
-        const { url: resolvedUrl, headers } = resolveEndpointAndHeaders();
+        const { url: resolvedUrl, headers, error } = resolveEndpointAndHeaders();
 
-        if (!resolvedUrl) {
+        if (!resolvedUrl || error) {
             return createErrorResponse(
-                "No default GraphQL endpoint configured in environment variables (DEFAULT_GRAPHQL_ENDPOINT)",
+                error || "No GraphQL endpoint available",
                 {
                     errorCode: ErrorCode.SCHEMA_ERROR,
-                    suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT in your .env file'
+                    suggestion: 'Set DEFAULT_GRAPHQL_ENDPOINT environment variable'
                 }
             );
         }
 
-        const schema = await fetchAndCacheSchema(headers);
+        const schema = await fetchAndCacheSchema();
         const inputType = schema.getType(inputTypeName);
 
         if (!inputType || !isInputObjectType(inputType)) {
@@ -111,12 +111,12 @@ export async function getInputObjectHelp(
 
 export const getInputObjectHelpTool = {
     name: "get-input-help",
-    description: "Get guidance and field information for GraphQL input object types to help with argument construction",
+    description: "Get guidance and field information for GraphQL input object types to help with argument construction.",
     schema: {
-        inputTypeName: z.string().describe('The name of the GraphQL input type to get help for.'),
+        inputTypeName: z.string().describe('The name of the GraphQL input type to get help for.')
     },
     handler: async ({ inputTypeName }: {
-        inputTypeName: string
+        inputTypeName: string;
     }) => {
         const result = await getInputObjectHelp(inputTypeName);
         const { wrapToolResponse } = await import('./shared-utils.js');
