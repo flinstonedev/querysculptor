@@ -80,10 +80,16 @@
                 <p class="text-2xl md:text-3xl font-semibold text-gray-300 mb-4">
                     🚀 GraphQL for AI Agents
                 </p>
-                <p class="text-lg text-gray-400 mb-8 max-w-4xl mx-auto leading-relaxed">
+                <p class="text-lg text-gray-400 mb-4 max-w-4xl mx-auto leading-relaxed">
                     A server application that helps AI agents interact with GraphQL APIs through structured
                     tools instead of raw query generation.
                 </p>
+                <div class="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-yellow-900/40 text-yellow-300 border border-yellow-700/50 mb-4">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    Experimental Demo Server - Not for Production Use
+                </div>
                 <div class="flex flex-wrap justify-center gap-4 mt-8">
                     <span
                         class="inline-flex items-center px-6 py-3 rounded-full text-sm font-semibold bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg hover:shadow-blue-500/25 transition-all duration-300">
@@ -285,10 +291,245 @@
                 </div>
             </div>
         </section>
+
+        <!-- Footer -->
+        <footer class="mt-16 bg-dark-900/60 backdrop-blur-xl rounded-2xl p-8 shadow-2xl border border-gray-800/50">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                <div class="text-gray-400 text-sm">
+                    <p>&copy; 2025 QuerySculptor Contributors. Licensed under <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">Apache License 2.0</a></p>
+                </div>
+                <div class="flex gap-6 text-sm">
+                    <button onclick="openModal('terms-modal')" class="text-gray-400 hover:text-gray-200 transition-colors">Terms of Service</button>
+                    <button onclick="openModal('privacy-modal')" class="text-gray-400 hover:text-gray-200 transition-colors">Privacy Policy</button>
+                    <a href="https://github.com/flinstonedev/querysculptor" target="_blank" rel="noopener noreferrer" class="text-gray-400 hover:text-gray-200 transition-colors">GitHub</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Terms of Service Modal -->
+    <div id="terms-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-dark-900 rounded-2xl max-w-4xl max-h-[90vh] overflow-hidden border border-gray-800 shadow-2xl w-full">
+            <div class="flex items-center justify-between p-6 border-b border-gray-800">
+                <h2 class="text-2xl font-bold text-gray-100">Terms of Service</h2>
+                <button onclick="closeModal('terms-modal')" class="text-gray-400 hover:text-gray-200 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto max-h-[calc(90vh-80px)] text-gray-300 space-y-6">
+                <div class="bg-yellow-900/30 border border-yellow-700/50 rounded-xl p-4">
+                    <div class="flex items-start">
+                        <span class="text-2xl mr-3">⚠️</span>
+                        <div>
+                            <h3 class="font-bold text-yellow-400 mb-1">Experimental Demo Server</h3>
+                            <p class="text-yellow-200/80 text-sm">QuerySculptor is an <strong>experimental demo server</strong> provided for testing and evaluation purposes only. It is not intended for production use. The service may be discontinued, modified, or experience downtime without prior notice.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-400 mb-4">Last updated: January 2025</p>
+                </div>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">1. Acceptance of Terms</h3>
+                    <p>By accessing or using QuerySculptor ("the Service"), you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the Service.</p>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">2. Service Description</h3>
+                    <p>QuerySculptor is an <strong>experimental demo</strong> MCP (Model Context Protocol) server that provides tools for AI agents to build GraphQL queries programmatically. The Service is provided free of charge for demonstration and evaluation purposes.</p>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">3. Open Source License</h3>
+                    <p class="mb-3">The QuerySculptor software is licensed under the <strong>Apache License, Version 2.0</strong>. Under this license, you are granted:</p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li>A perpetual, worldwide, non-exclusive, royalty-free license to use, reproduce, modify, and distribute the software</li>
+                        <li>The right to create and distribute derivative works</li>
+                        <li>A patent license for any patents necessarily infringed by the software</li>
+                    </ul>
+                    <p class="mt-3">You must include the original copyright notice and license in any copies or substantial portions of the software. The full license text is available at <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">apache.org/licenses/LICENSE-2.0</a>.</p>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">4. Disclaimer of Warranty</h3>
+                    <p class="uppercase text-sm">THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING, WITHOUT LIMITATION, ANY WARRANTIES OR CONDITIONS OF TITLE, NON-INFRINGEMENT, MERCHANTABILITY, OR FITNESS FOR A PARTICULAR PURPOSE.</p>
+                    <p class="mt-3">You are solely responsible for determining the appropriateness of using the Service and assume any risks associated with your use.</p>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">5. Limitation of Liability</h3>
+                    <p class="uppercase text-sm">IN NO EVENT SHALL THE CONTRIBUTORS BE LIABLE TO YOU FOR ANY DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES ARISING OUT OF OR IN CONNECTION WITH YOUR USE OF THE SERVICE, INCLUDING BUT NOT LIMITED TO DAMAGES FOR LOSS OF GOODWILL, WORK STOPPAGE, DATA LOSS, COMPUTER FAILURE OR MALFUNCTION, OR ANY OTHER COMMERCIAL DAMAGES OR LOSSES.</p>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">6. Acceptable Use</h3>
+                    <p class="mb-3">You agree not to use the Service to:</p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li>Violate any applicable laws or regulations</li>
+                        <li>Attempt to gain unauthorized access to any systems or networks</li>
+                        <li>Transmit malicious code or conduct denial-of-service attacks</li>
+                        <li>Use the Service as a general-purpose proxy for unauthorized purposes</li>
+                        <li>Abuse rate limits or attempt to circumvent security measures</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">7. Service Availability</h3>
+                    <p>As an experimental demo, we do not guarantee any level of service availability, uptime, or support. The Service may be modified, suspended, or discontinued at any time without notice.</p>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">8. Changes to Terms</h3>
+                    <p>We reserve the right to modify these Terms at any time. Continued use of the Service after changes constitutes acceptance of the modified Terms.</p>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">9. Contact</h3>
+                    <p>For questions about these Terms, please open an issue on our <a href="https://github.com/flinstonedev/querysculptor/issues" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">GitHub repository</a>.</p>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- Privacy Policy Modal -->
+    <div id="privacy-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-dark-900 rounded-2xl max-w-4xl max-h-[90vh] overflow-hidden border border-gray-800 shadow-2xl w-full">
+            <div class="flex items-center justify-between p-6 border-b border-gray-800">
+                <h2 class="text-2xl font-bold text-gray-100">Privacy Policy</h2>
+                <button onclick="closeModal('privacy-modal')" class="text-gray-400 hover:text-gray-200 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto max-h-[calc(90vh-80px)] text-gray-300 space-y-6">
+                <div class="bg-blue-900/30 border border-blue-700/50 rounded-xl p-4">
+                    <div class="flex items-start">
+                        <span class="text-2xl mr-3">🔒</span>
+                        <div>
+                            <h3 class="font-bold text-blue-400 mb-1">Privacy-First Approach</h3>
+                            <p class="text-blue-200/80 text-sm">QuerySculptor is designed with privacy in mind. We minimize data collection and do not store personal information.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-400 mb-4">Last updated: January 2025</p>
+                </div>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">1. Introduction</h3>
+                    <p>This Privacy Policy explains how QuerySculptor ("we", "our", or "the Service") collects, uses, and protects information when you use our experimental demo service.</p>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">2. Information We Collect</h3>
+                    
+                    <h4 class="text-lg font-medium text-gray-200 mt-4 mb-2">2.1 Session Data</h4>
+                    <p class="mb-3">When you use the MCP tools, we temporarily store:</p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li><strong>Session identifiers:</strong> Randomly generated IDs to track your query-building session</li>
+                        <li><strong>Query structure:</strong> The GraphQL queries you build during a session</li>
+                        <li><strong>Session metadata:</strong> Timestamps and operation types</li>
+                    </ul>
+                    <p class="mt-3 text-sm text-gray-400">Session data is automatically deleted after 1 hour of inactivity or when you end your session.</p>
+
+                    <h4 class="text-lg font-medium text-gray-200 mt-4 mb-2">2.2 Analytics (Optional)</h4>
+                    <p class="mb-3">If you consent, we use PostHog to collect anonymous usage analytics:</p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li>Page views and feature usage patterns</li>
+                        <li>Browser type and general location (country level)</li>
+                        <li>Session duration and interaction patterns</li>
+                    </ul>
+                    <p class="mt-3">You can opt out of analytics at any time using the cookie consent banner. We do <strong>not</strong> collect personal identifiers, names, email addresses, or account information.</p>
+
+                    <h4 class="text-lg font-medium text-gray-200 mt-4 mb-2">2.3 Server Logs</h4>
+                    <p>For security and debugging purposes, we may log:</p>
+                    <ul class="list-disc list-inside space-y-2 ml-4 mt-2">
+                        <li>IP addresses (for rate limiting)</li>
+                        <li>Request timestamps</li>
+                        <li>Error messages (without sensitive data)</li>
+                    </ul>
+                    <p class="mt-3 text-sm text-gray-400">Server logs are retained for up to 7 days.</p>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">3. Information We Do NOT Collect</h3>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li>Personal identification information (names, emails, phone numbers)</li>
+                        <li>Authentication credentials or API keys you use with external GraphQL APIs</li>
+                        <li>The actual data returned from GraphQL query executions</li>
+                        <li>Financial or payment information</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">4. How We Use Information</h3>
+                    <p class="mb-3">We use collected information to:</p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li>Provide and maintain the query-building service</li>
+                        <li>Enforce rate limits and prevent abuse</li>
+                        <li>Improve the Service based on usage patterns</li>
+                        <li>Debug issues and ensure security</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">5. Data Storage and Security</h3>
+                    <p>Session data is stored in Redis with encryption in transit. We implement security measures including:</p>
+                    <ul class="list-disc list-inside space-y-2 ml-4 mt-2">
+                        <li>HTTPS encryption for all connections</li>
+                        <li>Rate limiting to prevent abuse</li>
+                        <li>Automatic session expiration</li>
+                        <li>SSRF protection for GraphQL endpoint validation</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">6. Third-Party Services</h3>
+                    <p class="mb-3">We use the following third-party services:</p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li><strong>Vercel:</strong> Hosting and serverless infrastructure</li>
+                        <li><strong>Upstash Redis:</strong> Session storage</li>
+                        <li><strong>PostHog:</strong> Analytics (optional, with consent)</li>
+                    </ul>
+                    <p class="mt-3">Each service has its own privacy policy governing their data practices.</p>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">7. Your Rights</h3>
+                    <p class="mb-3">You have the right to:</p>
+                    <ul class="list-disc list-inside space-y-2 ml-4">
+                        <li>Opt out of analytics tracking</li>
+                        <li>End your session at any time (which deletes session data)</li>
+                        <li>Request information about data we hold (contact us via GitHub)</li>
+                    </ul>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">8. Children's Privacy</h3>
+                    <p>The Service is not directed at children under 13. We do not knowingly collect information from children.</p>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">9. Changes to This Policy</h3>
+                    <p>We may update this Privacy Policy from time to time. Changes will be posted on this page with an updated revision date.</p>
+                </section>
+
+                <section>
+                    <h3 class="text-xl font-semibold text-gray-100 mb-3">10. Contact</h3>
+                    <p>For privacy-related questions or concerns, please open an issue on our <a href="https://github.com/flinstonedev/querysculptor/issues" target="_blank" rel="noopener noreferrer" class="text-blue-400 hover:text-blue-300 underline">GitHub repository</a>.</p>
+                </section>
+            </div>
+        </div>
     </div>
 
     <!-- GDPR Cookie Consent Banner -->
-    <div id="analytics-banner" class="fixed bottom-0 left-0 right-0 bg-dark-900 border-t border-gray-800 shadow-2xl z-50">
+    <div id="analytics-banner" class="fixed bottom-0 left-0 right-0 bg-dark-900 border-t border-gray-800 shadow-2xl z-40">
         <div class="container mx-auto px-4 py-6 max-w-6xl">
             <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                 <div class="flex-1">
@@ -310,6 +551,40 @@
     </div>
 
     <script>
+        // Modal management
+        function openModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(modalId) {
+            const modal = document.getElementById(modalId);
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.style.overflow = '';
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('fixed') && e.target.id.includes('-modal')) {
+                closeModal(e.target.id);
+            }
+        });
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const modals = document.querySelectorAll('[id$="-modal"]');
+                modals.forEach(modal => {
+                    if (!modal.classList.contains('hidden')) {
+                        closeModal(modal.id);
+                    }
+                });
+            }
+        });
+
         // Analytics consent management
         function acceptAnalytics() {
             localStorage.setItem('querysculptor-analytics-opted-out', 'false');
