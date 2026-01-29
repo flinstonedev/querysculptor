@@ -11,25 +11,26 @@ export interface RateLimitError extends Error {
 }
 
 // Complexity-based rate limit configurations
+// Intentionally restrictive to prevent abuse
 export const COMPLEXITY_RATE_LIMITS = {
     low: {
         windowMs: 60000,
-        maxRequests: 100,
+        maxRequests: 30,
         keyPrefix: 'complexity-low'
     },
     medium: {
         windowMs: 60000,
-        maxRequests: 50,
+        maxRequests: 15,
         keyPrefix: 'complexity-medium'
     },
     high: {
         windowMs: 60000,
-        maxRequests: 20,
+        maxRequests: 5,
         keyPrefix: 'complexity-high'
     },
     extreme: {
         windowMs: 60000,
-        maxRequests: 5,
+        maxRequests: 2,
         keyPrefix: 'complexity-extreme'
     }
 } as const;

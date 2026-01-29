@@ -160,25 +160,26 @@ export class RateLimiter {
 }
 
 // Default rate limit configurations (can be overridden by environment variables)
+// These are intentionally restrictive to prevent abuse
 export const RATE_LIMIT_CONFIGS = {
     global: {
         windowMs: parseInt(process.env.RATE_LIMIT_GLOBAL_WINDOW_MS || '60000'),
-        maxRequests: parseInt(process.env.RATE_LIMIT_GLOBAL_MAX_REQUESTS || '2000'),
+        maxRequests: parseInt(process.env.RATE_LIMIT_GLOBAL_MAX_REQUESTS || '500'),
         keyPrefix: 'global'
     },
     perClient: {
         windowMs: parseInt(process.env.RATE_LIMIT_CLIENT_WINDOW_MS || '60000'),
-        maxRequests: parseInt(process.env.RATE_LIMIT_CLIENT_MAX_REQUESTS || '50'),
+        maxRequests: parseInt(process.env.RATE_LIMIT_CLIENT_MAX_REQUESTS || '20'),
         keyPrefix: 'client'
     },
     expensive: {
         windowMs: parseInt(process.env.RATE_LIMIT_EXPENSIVE_WINDOW_MS || '60000'),
-        maxRequests: parseInt(process.env.RATE_LIMIT_EXPENSIVE_MAX_REQUESTS || '10'),
+        maxRequests: parseInt(process.env.RATE_LIMIT_EXPENSIVE_MAX_REQUESTS || '5'),
         keyPrefix: 'expensive'
     },
     schema: {
         windowMs: parseInt(process.env.RATE_LIMIT_SCHEMA_WINDOW_MS || '300000'),
-        maxRequests: parseInt(process.env.RATE_LIMIT_SCHEMA_MAX_REQUESTS || '5'),
+        maxRequests: parseInt(process.env.RATE_LIMIT_SCHEMA_MAX_REQUESTS || '2'),
         keyPrefix: 'schema'
     }
 } as const;
