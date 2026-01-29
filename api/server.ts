@@ -6,12 +6,36 @@ import { getAllTools } from '../tools/index.js';
 // Load environment variables from .env file
 config({ path: '.env' });
 
+// Check for maintenance mode
+const isMaintenanceMode = process.env.MAINTENANCE_MODE === 'true';
+const maintenanceMessage = process.env.MAINTENANCE_MESSAGE || 'QuerySculptor is currently under maintenance. Please try again later.';
+
 // Initialize rate limiting middleware
 const rateLimitMiddleware = new RateLimitMiddleware(process.env.REDIS_URL);
 
 const allTools = getAllTools();
 
 const handler = createMcpHandler((server: any) => {
+    // If in maintenance mode, register a single tool that returns the maintenance message
+    if (isMaintenanceMode) {
+        server.tool(
+            'maintenance-status',
+            'Server maintenance status',
+            {},
+            async () => ({
+                content: [{
+                    type: 'text',
+                    text: JSON.stringify({
+                        status: 'maintenance',
+                        message: maintenanceMessage
+                    }, null, 2)
+                }]
+            })
+        );
+        console.log('Server is in maintenance mode - only maintenance-status tool registered');
+        return;
+    }
+
     for (const tool of allTools) {
         try {
             // Validate tool schema before registration
