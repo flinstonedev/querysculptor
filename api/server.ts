@@ -18,19 +18,27 @@ const allTools = getAllTools();
 const handler = createMcpHandler((server: any) => {
     // If in maintenance mode, register a single tool that returns the maintenance message
     if (isMaintenanceMode) {
+        const maintenanceHandler = async () => ({
+            content: [{
+                type: 'text',
+                text: JSON.stringify({
+                    status: 'maintenance',
+                    message: maintenanceMessage
+                }, null, 2)
+            }]
+        });
+
+        // Wrap with rate limiting to prevent spam
+        const rateLimitedMaintenanceHandler = rateLimitMiddleware.wrapToolHandler(
+            'maintenance-status',
+            maintenanceHandler
+        );
+
         server.tool(
             'maintenance-status',
             'Server maintenance status',
             {},
-            async () => ({
-                content: [{
-                    type: 'text',
-                    text: JSON.stringify({
-                        status: 'maintenance',
-                        message: maintenanceMessage
-                    }, null, 2)
-                }]
-            })
+            rateLimitedMaintenanceHandler
         );
         console.log('Server is in maintenance mode - only maintenance-status tool registered');
         return;
